@@ -1,18 +1,33 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import * as React from 'react';
+import { Platform, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import '@/global.css';
+import { CalendarProvider } from '@/context/calendar-context';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+export default function RootLayout() {
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      document.title = 'Actually Usable Calendar';
+    }
+  }, []);
 
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <CalendarProvider>
+      {/* `dark` anchors NativeWind's dark: variants; our CSS variables are dark-first. */}
+      <View className="dark flex-1 bg-background">
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: 'hsl(var(--background))' },
+            animation: 'slide_from_right',
+          }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="setup" />
+          <Stack.Screen name="settings" />
+        </Stack>
+      </View>
+    </CalendarProvider>
   );
 }

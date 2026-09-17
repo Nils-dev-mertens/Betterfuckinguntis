@@ -5,6 +5,7 @@ import { fetchLessons } from '@/lib/sync';
 import { matchesRule, ruleFromLesson } from '@/lib/hidden';
 import type { AppData, ClassTimetable, HiddenRule, Lesson, SyncConfig } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns';
 
 interface SyncOutcome {
   ok: boolean;
@@ -27,6 +28,10 @@ interface CalendarContextValue {
   addClass: (config: SyncConfig) => Promise<SyncOutcome>;
   /** Removes a watched class */
   removeClass: (config: SyncConfig) => Promise<void>;
+  /** Adds a manually created lesson */
+  addLesson: (lesson: Omit<Lesson, 'uid' | 'manual'>) => Promise<void>;
+  /** Removes a manually created lesson */
+  removeLesson: (uid: string) => Promise<void>;
   /** Refreshes the timetable of every watched class */
   syncNow: () => Promise<boolean>;
   /** Removes everything, returning to onboarding */
@@ -156,9 +161,35 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     setSyncError(null);
   }, []);
 
+  const addLesson = useCallback(
+    async (lesson: Omit<Lesson, 'uid' | 'manual'>) => {
+      const manualLesson: Lesson = {
+        ...lesson,
+        uid: `manual-${uuidv4()}`,
+        manual: true,
+      };
+      await persist((current) => ({
+        ...current,
+        manualLessons: [...current.manualLessons, manualLesson],
+      }));
+    },
+    [persist]
+  );
+
+  const removeLesson = useCallback(
+    async (uid: string) => {
+      await persist((current) => ({
+        ...current,
+        manualLessons: current.manualLessons.filter((l) => l.uid !== uid),
+      }));
+    },
+    [persist]
+  );
+
   const lessons = useMemo(() => {
     const seen = new Set<string>();
     const merged: Lesson[] = [];
+    // Synced lessons first
     for (const entry of data.timetables) {
       for (const lesson of entry.lessons) {
         if (!seen.has(lesson.uid)) {
@@ -167,8 +198,15 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
+    // Manual lessons (they have unique uids)
+    for (const lesson of data.manualLessons) {
+      if (!seen.has(lesson.uid)) {
+        seen.add(lesson.uid);
+        merged.push(lesson);
+      }
+    }
     return merged;
-  }, [data.timetables]);
+  }, [data.timetables, data.manualLessons]);
 
   const value = useMemo<CalendarContextValue>(
     () => ({
@@ -183,10 +221,12 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       unhideRule,
       addClass,
       removeClass,
+      addLesson,
+      removeLesson,
       syncNow,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, syncNow, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, syncNow, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

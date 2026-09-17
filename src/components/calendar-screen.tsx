@@ -2,11 +2,12 @@ import { addDays, addWeeks, format, isSameWeek, subWeeks } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { ChevronLeft, ChevronRight, List, Settings2, CalendarDays, RefreshCw, EyeOff } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, List, Settings2, CalendarDays, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
 import { CalendarHeader } from '@/components/calendar-header';
 import { LessonSheet } from '@/components/lesson-sheet';
 import { WeekAgenda } from '@/components/week-agenda';
 import { WeekGrid } from '@/components/week-grid';
+import { AddLessonSheet } from '@/components/add-lesson-sheet';
 import { useCalendar } from '@/context/calendar-context';
 import { lessonOverlapsRange, formatWeekLabel, weekDays, weekStartOf } from '@/lib/time';
 import type { Lesson } from '@/lib/types';
@@ -17,11 +18,12 @@ type ViewMode = 'grid' | 'list';
 
 export function CalendarScreen() {
   const router = useRouter();
-  const { data, lessons, syncing, syncNow, isHidden, syncError, hiddenRules } = useCalendar();
+  const { data, lessons, syncing, syncNow, isHidden, syncError, hiddenRules, addLesson } = useCalendar();
 
   const [weekStart, setWeekStart] = React.useState<Date>(() => weekStartOf(new Date()));
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
   const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
+  const [showAddLesson, setShowAddLesson] = React.useState(false);
   const [now, setNow] = React.useState(() => new Date());
 
   React.useEffect(() => {
@@ -100,6 +102,11 @@ export function CalendarScreen() {
             )}
           </Pressable>
           <Pressable
+            onPress={() => setShowAddLesson(true)}
+            className="h-8 w-8 items-center justify-center rounded-md bg-primary active:bg-primary/90">
+            <Plus size={15} color="hsl(var(--primary-foreground))" />
+          </Pressable>
+          <Pressable
             onPress={() => router.push('/settings')}
             accessibilityLabel="Open settings"
             className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
@@ -163,6 +170,7 @@ export function CalendarScreen() {
       )}
 
       <LessonSheet lesson={selectedLesson} onClose={() => setSelectedLesson(null)} />
+      <AddLessonSheet isOpen={showAddLesson} onClose={() => setShowAddLesson(false)} onAdd={addLesson} />
 
       {hiddenRules.length > 0 && viewMode === 'grid' && (
         <View className="absolute bottom-3 right-3 flex-row items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg shadow-black/40">

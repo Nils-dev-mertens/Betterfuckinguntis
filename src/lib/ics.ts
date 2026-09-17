@@ -151,6 +151,7 @@ export function parseIcs(icsText: string): Lesson[] {
         .map((l) => l.trim())
         .filter(Boolean),
       classes,
+      manual: false,
     });
   }
 

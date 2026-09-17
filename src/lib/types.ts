@@ -33,6 +33,8 @@ export interface Lesson {
   locations: string[];
   /** Class names covered by this lesson */
   classes: string[];
+  /** Whether this lesson was created manually (not from server sync) */
+  manual?: boolean;
 }
 
 /** A rule that hides one recurring weekly class slot, now and in future weeks. */
@@ -63,10 +65,17 @@ export interface SyncConfig {
   dateRange?: DateRange;
 }
 
-export interface AppData {
-  config: SyncConfig | null;
-  /** Clock of lessons fetched during the last successful sync */
+/** Stored lessons for one watched class. */
+export interface ClassTimetable {
+  config: SyncConfig;
   lessons: Lesson[];
+}
+
+export interface AppData {
+  /** Every watched class with its fetched lessons */
+  timetables: ClassTimetable[];
+  /** Manually created lessons (not from server sync) */
+  manualLessons: Lesson[];
   hidden: HiddenRule[];
   /** Epoch ms of the last successful sync */
   lastSyncedAt: number | null;

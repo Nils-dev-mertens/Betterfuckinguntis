@@ -3,39 +3,84 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
-import { ArrowLeft, Check, Clock3, EyeOff, Info, Layers, Link2, Wrench } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Check,
+  Clock3,
+  EyeOff,
+  FileDown,
+  Info,
+  Layers,
+  Link2,
+  Plus,
+  RefreshCw,
+  Wrench,
+  X,
+} from 'lucide-react-native';
 import { useCalendar } from '@/context/calendar-context';
 import { countHiddenForRule } from '@/lib/hidden';
 import { normalizeBaseUrl } from '@/lib/sync';
+import { downloadLessonsCsv } from '@/lib/csv';
+import type { SyncConfig } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
+function calendarUrl(config: SyncConfig): string {
+  const params = new URLSearchParams({ class: String(config.classId) });
+  if (config.dateRange) {
+    params.set('start', config.dateRange.start);
+    params.set('end', config.dateRange.end);
+  }
+  return `${normalizeBaseUrl(config.baseUrl)}/calendar?${params.toString()}`;
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
-  const { data, syncing, syncNow, unhideRule, resetAll, hiddenRules } = useCalendar();
-  const [copied, setCopied] = React.useState(false);
+  const { data, lessons, syncing, syncNow, unhideRule, resetAll, hiddenRules, removeClass, isHidden } =
+    useCalendar();
+  const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null);
 
-  const syncUrl = React.useMemo(() => {
-    if (!data.config) return null;
-    const params = new URLSearchParams({ class: String(data.config.classId) });
-    if (data.config.dateRange) {
-      params.set('start', data.config.dateRange.start);
-      params.set('end', data.config.dateRange.end);
+  const visibleLessons = React.useMemo(
+    () => lessons.filter((lesson) => !isHidden(lesson)),
+    [lessons, isHidden]
+  );
+
+  const copyUrl = React.useCallback(async (config: SyncConfig) => {
+    const url = calendarUrl(config);
+    await Clipboard.setStringAsync(url);
+    setCopiedUrl(url);
+    setTimeout(() => setCopiedUrl((current) => (current === url ? null : current)), 2000);
+  }, []);
+
+  const confirmRemove = React.useCallback(
+    (config: SyncConfig) => {
+      const message = `Remove ${config.className} and its lessons from this device?`;
+      const run = () => void removeClass(config);
+      if (Platform.OS === 'web') {
+        if (window.confirm(message)) run();
+      } else {
+        Alert.alert('Remove class?', message, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: run },
+        ]);
+      }
+    },
+    [removeClass]
+  );
+
+  const exportCsv = React.useCallback(async () => {
+    try {
+      await downloadLessonsCsv(visibleLessons);
+    } catch (error) {
+      // Surface export failures (e.g. sharing unavailable) next to the button.
+      Alert.alert('Export failed', error instanceof Error ? error.message : 'Could not export.');
     }
-    return `${normalizeBaseUrl(data.config.baseUrl)}/calendar?${params.toString()}`;
-  }, [data.config]);
-
-  const copySyncUrl = React.useCallback(async () => {
-    if (!syncUrl) return;
-    await Clipboard.setStringAsync(syncUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [syncUrl]);
+  }, [visibleLessons]);
 
   const confirmReset = React.useCallback(() => {
-    const message = 'This removes your class schedule and all hidden classes from this device.';
+    const message = 'This removes your class schedules and all hidden classes from this device.';
     const run = () => {
       void resetAll().then(() => router.replace('/setup'));
     };
@@ -48,6 +93,9 @@ export default function SettingsScreen() {
       ]);
     }
   }, [resetAll, router]);
+
+  // Hide the "remove" affordance while a sync is in flight to keep the list stable.
+  const removable = !syncing;
 
   return (
     <View className="flex-1 bg-background">
@@ -69,56 +117,107 @@ export default function SettingsScreen() {
         contentContainerClassName="p-4 gap-4"
         ListHeaderComponent={
           <View className="gap-4">
-            {/* Class card */}
+            {/* Class list */}
             <View className="rounded-xl border border-border bg-card p-4">
               <View className="flex-row items-center gap-2">
                 <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
                   <Layers size={15} color="hsl(var(--primary))" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-sm font-bold">{data.config?.className ?? 'No class selected'}</Text>
+                  <Text className="text-sm font-bold">
+                    {data.timetables.length > 0
+                      ? `${data.timetables.length} class${data.timetables.length === 1 ? '' : 'es'}`
+                      : 'No class synced yet'}
+                  </Text>
                   <Text className="text-xs text-muted-foreground">
-                    {data.config?.schoolYear ?? 'Current school year'} · {data.config?.baseUrl}
+                    {data.timetables[0]?.config.schoolYear ?? 'Current school year'}
                   </Text>
                 </View>
               </View>
 
-              <View className="mt-3 flex-row items-center justify-between rounded-md bg-secondary px-3 py-2">
-                <View className="flex-row items-center gap-2">
-                  <Clock3 size={13} color="hsl(var(--muted-foreground))" />
-                  <Text className="text-xs text-muted-foreground">
-                    {data.lastSyncedAt
-                      ? `Synced ${format(data.lastSyncedAt, 'd MMM yyyy · HH:mm')}`
-                      : 'Never synced'}
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1">
-                  {syncing ? (
-                    <ActivityIndicator size="small" color="hsl(var(--primary))" />
-                  ) : (
-                    <Text className="text-xs font-semibold text-muted-foreground">
-                      {data.lessons.length} classes
+              {data.timetables.length > 0 && (
+                <View className="mt-3 flex-row items-center justify-between rounded-md bg-secondary px-3 py-2">
+                  <View className="flex-row items-center gap-2">
+                    <Clock3 size={13} color="hsl(var(--muted-foreground))" />
+                    <Text className="text-xs text-muted-foreground">
+                      {data.lastSyncedAt
+                        ? `Synced ${format(data.lastSyncedAt, 'd MMM yyyy · HH:mm')}`
+                        : 'Never synced'}
                     </Text>
-                  )}
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    {syncing ? (
+                      <ActivityIndicator size="small" color="hsl(var(--primary))" />
+                    ) : (
+                      <Text className="text-xs font-semibold text-muted-foreground">
+                        {visibleLessons.length} lessons
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
+              )}
+
+              {data.timetables.map((entry) => {
+                const activeCopy = copiedUrl === calendarUrl(entry.config);
+                return (
+                  <View
+                    key={`${entry.config.baseUrl}-${entry.config.classId}`}
+                    className="mt-2 flex-row items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold">{entry.config.className}</Text>
+                      <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
+                        {entry.lessons.length} lessons · {entry.config.baseUrl}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => void copyUrl(entry.config)}
+                      accessibilityLabel={`Copy sync URL for ${entry.config.className}`}
+                      className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
+                      {activeCopy ? (
+                        <Check size={14} color="hsl(var(--primary))" />
+                      ) : (
+                        <Link2 size={14} color="hsl(var(--muted-foreground))" />
+                      )}
+                    </Pressable>
+                    {removable && (
+                      <Pressable
+                        onPress={() => confirmRemove(entry.config)}
+                        accessibilityLabel={`Remove ${entry.config.className}`}
+                        className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-destructive/20">
+                        <X size={14} color="hsl(var(--muted-foreground))" />
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
 
               <View className="mt-3 flex-row gap-2">
-                <Button variant="outline" size="sm" className="flex-1" disabled={syncing} onPress={() => void syncNow()}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  disabled={syncing || data.timetables.length === 0}
+                  onPress={() => void syncNow()}>
+                  {syncing ? (
+                    <ActivityIndicator size="small" color="hsl(var(--foreground))" />
+                  ) : (
+                    <RefreshCw size={14} color="hsl(var(--foreground))" />
+                  )}
                   <Text>Sync now</Text>
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" onPress={() => router.push('/setup')}>
-                  <Text>Change class</Text>
+                  <Plus size={14} color="hsl(var(--foreground))" />
+                  <Text>Add class</Text>
                 </Button>
               </View>
               <View className="mt-2">
-                <Button variant="secondary" size="sm" disabled={!syncUrl || syncing} onPress={copySyncUrl}>
-                  {copied ? (
-                    <Check size={14} color="hsl(var(--muted-foreground))" />
-                  ) : (
-                    <Link2 size={14} color="hsl(var(--muted-foreground))" />
-                  )}
-                  <Text>{copied ? 'Copied!' : 'Copy sync URL (for other calendar apps)'}</Text>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={visibleLessons.length === 0}
+                  onPress={() => void exportCsv()}>
+                  <FileDown size={14} color="hsl(var(--muted-foreground))" />
+                  <Text>Export timetable (CSV)</Text>
                 </Button>
               </View>
             </View>
@@ -158,8 +257,8 @@ export default function SettingsScreen() {
             <View className="flex-1 pr-3">
               <Text className="text-sm font-semibold">{item.label}</Text>
               <Text className="mt-0.5 text-xs text-muted-foreground">
-                {countHiddenForRule(item, data.lessons)} lesson
-                {countHiddenForRule(item, data.lessons) === 1 ? '' : 's'} across weeks
+                {countHiddenForRule(item, lessons)} lesson
+                {countHiddenForRule(item, lessons) === 1 ? '' : 's'} across weeks
               </Text>
             </View>
             <Switch

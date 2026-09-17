@@ -16,7 +16,7 @@ export default function IndexScreen() {
     );
   }
 
-  if (!data.config) {
+  if (data.timetables.length === 0) {
     return <Redirect href="/setup" />;
   }
 

@@ -80,7 +80,7 @@ function layoutDay(lessons: Lesson[], dayStartMinutes: number): PositionedLesson
 
 function TimeAxis({ startHour, hoursCount }: { startHour: number; hoursCount: number }) {
   return (
-    <View style={{ width: TIME_AXIS_WIDTH }}>
+    <View style={{ width: TIME_AXIS_WIDTH, flexShrink: 0 }}>
       {Array.from({ length: hoursCount + 1 }, (_, i) => {
         const hour = startHour + i;
         return (
@@ -158,103 +158,108 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson }: WeekGrid
 
   const hoursCount = dayEnd - dayStart;
   const dayStartMinutes = dayStart * 60;
-  const columnWidthClass =
-    Platform.OS === 'web' ? 'flex-1' : 'w-[164px] max-w-[164px] min-w-[164px]';
+  const isWeb = Platform.OS === 'web';
 
-  return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-      <View className="flex-row">
-        <TimeAxis startHour={dayStart} hoursCount={hoursCount} />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className={cn('flex-1', Platform.OS === 'web' && 'flex-none')}
-          contentContainerStyle={Platform.OS === 'web' ? { flex: 1 } : undefined}>
-          {days.map((day, dayIndex) => {
-            const isToday = isSameDay(day, today);
-            const positions = layoutDay(lessonsForDay(day), dayStartMinutes);
-            const nowLine = isToday
-              ? (minutesOfDay(new Date()) - dayStartMinutes) * (HOUR_HEIGHT / 60)
-              : null;
+  const renderDay = (day: Date, dayIndex: number) => {
+    const isToday = isSameDay(day, today);
+    const positions = layoutDay(lessonsForDay(day), dayStartMinutes);
+    const nowLine = isToday
+      ? (minutesOfDay(new Date()) - dayStartMinutes) * (HOUR_HEIGHT / 60)
+      : null;
 
+    return (
+      <View
+        key={dayKey(day)}
+        className={cn(
+          isWeb ? 'min-w-[132px] flex-1' : 'w-[164px] max-w-[164px] min-w-[164px]',
+          'border-l border-border',
+          dayIndex === 0 && 'border-l-0',
+          isToday && 'bg-primary/[0.04]'
+        )}>
+        {/* Day header */}
+        <View className="border-b border-border px-2 py-2">
+          <Text
+            className={cn(
+              'text-xs font-bold uppercase tracking-wide',
+              isToday ? 'text-primary' : 'text-muted-foreground'
+            )}>
+            {format(day, 'EEEE')}
+          </Text>
+          <Text className={cn('text-xl font-extrabold', isToday ? 'text-primary' : 'text-foreground')}>
+            {format(day, 'd')}
+          </Text>
+        </View>
+
+        {/* Body */}
+        <View style={{ height: hoursCount * HOUR_HEIGHT }}>
+          {Array.from({ length: hoursCount }, (_, i) => {
+            const top = (i + 1) * HOUR_HEIGHT - 1;
+            const isHour = (dayStart + i + 1) % 12 !== 0;
             return (
               <View
-                key={dayKey(day)}
-                className={cn(
-                  columnWidthClass,
-                  'border-l border-border',
-                  dayIndex === 0 && 'border-l-0',
-                  isToday && 'bg-primary/[0.04]'
-                )}>
-                {/* Day header */}
-                <View className="border-b border-border px-2 py-2">
-                  <Text
-                    className={cn(
-                      'text-xs font-bold uppercase tracking-wide',
-                      isToday ? 'text-primary' : 'text-muted-foreground'
-                    )}>
-                    {format(day, 'EEEE')}
-                  </Text>
-                  <Text className={cn('text-xl font-extrabold', isToday ? 'text-primary' : 'text-foreground')}>
-                    {format(day, 'd')}
-                  </Text>
-                </View>
-
-                {/* Body */}
-                <View style={{ height: hoursCount * HOUR_HEIGHT }}>
-                  {Array.from({ length: hoursCount }, (_, i) => {
-                    const top = (i + 1) * HOUR_HEIGHT - 1;
-                    const isHour = (dayStart + i + 1) % 12 !== 0;
-                    return (
-                      <View
-                        key={`${dayKey(day)}-${i}`}
-                        pointerEvents="none"
-                        style={{
-                          position: 'absolute',
-                          top,
-                          left: 0,
-                          right: 0,
-                          height: 1,
-                          backgroundColor: isHour ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)',
-                        }}
-                      />
-                    );
-                  })}
-                  {isToday && nowLine !== null && nowLine >= 0 && nowLine <= hoursCount * HOUR_HEIGHT && (
-                    <>
-                      <View
-                        pointerEvents="none"
-                        style={{
-                          position: 'absolute',
-                          top: nowLine,
-                          left: 0,
-                          right: 0,
-                          height: 1,
-                          backgroundColor: '#ef4444',
-                        }}
-                      />
-                      <View
-                        pointerEvents="none"
-                        style={{
-                          position: 'absolute',
-                          top: nowLine - 3,
-                          left: -2,
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: '#ef4444',
-                        }}
-                      />
-                    </>
-                  )}
-                  {positions.map((position) => (
-                    <LessonCard key={position.lesson.uid} position={position} onPress={onPressLesson} />
-                  ))}
-                </View>
-              </View>
+                key={`${dayKey(day)}-${i}`}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  backgroundColor: isHour ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)',
+                }}
+              />
             );
           })}
-        </ScrollView>
+          {isToday && nowLine !== null && nowLine >= 0 && nowLine <= hoursCount * HOUR_HEIGHT && (
+            <>
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: nowLine,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  backgroundColor: '#ef4444',
+                }}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: nowLine - 3,
+                  left: -2,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: '#ef4444',
+                }}
+              />
+            </>
+          )}
+          {positions.map((position) => (
+            <LessonCard key={position.lesson.uid} position={position} onPress={onPressLesson} />
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 w-full">
+      <View className="flex-row w-full">
+        <TimeAxis startHour={dayStart} hoursCount={hoursCount} />
+        {/* On screen-width displays the days share the full width; on touch
+            devices the columns keep their size and the row scrolls. */}
+        <View className="flex-1 min-w-0 w-full">
+          {isWeb ? (
+            <View className="flex-row w-full">{days.map(renderDay)}</View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-grow-0">
+              <View className="flex-row">{days.map(renderDay)}</View>
+            </ScrollView>
+          )}
+        </View>
       </View>
     </ScrollView>
   );

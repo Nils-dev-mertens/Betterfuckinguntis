@@ -1,32 +1,44 @@
 import * as React from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { matchesRule, ruleFromLesson } from '@/lib/hidden';
 import { clearAppData, EMPTY_DATA, loadAppData, saveAppData } from '@/lib/storage';
 import { fetchLessons } from '@/lib/sync';
-import type { AppData, HiddenRule, Lesson, SyncConfig } from '@/lib/types';
+import { matchesRule, ruleFromLesson } from '@/lib/hidden';
+import type { AppData, ClassTimetable, HiddenRule, Lesson, SyncConfig } from '@/lib/types';
+import { v4 as uuidv4 } from 'uuid';
+
+interface SyncOutcome {
+  ok: boolean;
+  error: string | null;
+}
 
 interface CalendarContextValue {
   /** Whether stored data has been loaded from disk */
   hydrated: boolean;
   data: AppData;
+  /** All lessons across every watched class, merged */
+  lessons: Lesson[];
   syncing: boolean;
   syncError: string | null;
   isHidden: (lesson: Lesson) => boolean;
   hiddenRules: HiddenRule[];
   hideLesson: (lesson: Lesson) => Promise<void>;
   unhideRule: (ruleId: string) => Promise<void>;
-  /** Refreshes the timeline using the stored config */
+  /** Adds a class (or replaces it if already watched) and syncs its timetable */
+  addClass: (config: SyncConfig) => Promise<SyncOutcome>;
+  /** Removes a watched class */
+  removeClass: (config: SyncConfig) => Promise<void>;
+  /** Refreshes the timetable of every watched class */
   syncNow: () => Promise<boolean>;
-  /** Configures a class and performs the initial sync */
-  completeSetup: (config: SyncConfig) => Promise<boolean>;
   /** Removes everything, returning to onboarding */
   resetAll: () => Promise<void>;
 }
 
 const CalendarContext = createContext<CalendarContextValue | null>(null);
 
-function emptyWith(overrides: Partial<AppData>): AppData {
-  return { ...EMPTY_DATA, ...overrides };
+/** Two configs refer to the same class when both the class id and server match. */
+function sameClass(a?: SyncConfig, b?: SyncConfig): boolean {
+  if (!a || !b) return false;
+  return a.classId === b.classId && a.baseUrl.trim().replace(/\/+$/, '') === b.baseUrl.trim().replace(/\/+$/, '');
 }
 
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
@@ -48,10 +60,16 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const persist = useCallback(async (next: AppData) => {
-    setData(next);
-    await saveAppData(next);
-  }, []);
+  const persist = useCallback(
+    async (next: AppData | ((current: AppData) => AppData)) => {
+      setData((current) => {
+        const value = typeof next === 'function' ? next(current) : next;
+        void saveAppData(value);
+        return value;
+      });
+    },
+    []
+  );
 
   const isHidden = useCallback(
     (lesson: Lesson) => data.hidden.some((rule) => matchesRule(lesson, rule)),
@@ -81,40 +99,56 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     [data, persist]
   );
 
-  const applySync = useCallback(async (config: SyncConfig) => {
-    setSyncing(true);
-    setSyncError(null);
-    try {
-      const lessons = await fetchLessons(config.baseUrl, config.classId, config.dateRange);
-      setData((current) => {
-        const next: AppData = {
-          config,
-          lessons,
-          // Keep hidden classes only if still watching the same class.
-          hidden: current.config?.classId === config.classId ? current.hidden : [],
-          lastSyncedAt: Date.now(),
-        };
-        void saveAppData(next);
-        return next;
-      });
-      return true;
-    } catch (error) {
-      setSyncError(error instanceof Error ? error.message : 'Sync failed');
-      return false;
-    } finally {
-      setSyncing(false);
-    }
-  }, []);
+  /** Fetch a set of classes and merge them into the stored timetables. */
+  const syncClasses = useCallback(
+    async (targets: SyncConfig[]): Promise<SyncOutcome> => {
+      setSyncing(true);
+      setSyncError(null);
+      try {
+        const results = await Promise.all(
+          targets.map((target) => fetchLessons(target.baseUrl, target.classId, target.dateRange))
+        );
+        const fetched: ClassTimetable[] = targets.map((config, i) => ({ config, lessons: results[i] }));
 
-  const completeSetup = useCallback(
-    async (config: SyncConfig) => applySync(config),
-    [applySync]
+        await persist((current) => {
+          const kept = current.timetables.filter(
+            (existing) => !fetched.some((f) => sameClass(f.config, existing.config))
+          );
+          return {
+            ...current,
+            timetables: [...kept, ...fetched],
+            lastSyncedAt: Date.now(),
+          };
+        });
+        return { ok: true, error: null };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Sync failed';
+        setSyncError(message);
+        return { ok: false, error: message };
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [persist]
+  );
+
+  const addClass = useCallback(async (config: SyncConfig) => syncClasses([config]), [syncClasses]);
+
+  const removeClass = useCallback(
+    async (config: SyncConfig) => {
+      await persist({
+        ...data,
+        timetables: data.timetables.filter((entry) => !sameClass(entry.config, config)),
+      });
+    },
+    [data, persist]
   );
 
   const syncNow = useCallback(async () => {
-    if (!data.config) return false;
-    return applySync(data.config);
-  }, [data.config, applySync]);
+    if (data.timetables.length === 0) return false;
+    const outcome = await syncClasses(data.timetables.map((entry) => entry.config));
+    return outcome.ok;
+  }, [data.timetables, syncClasses]);
 
   const resetAll = useCallback(async () => {
     await clearAppData();
@@ -122,21 +156,37 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     setSyncError(null);
   }, []);
 
+  const lessons = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: Lesson[] = [];
+    for (const entry of data.timetables) {
+      for (const lesson of entry.lessons) {
+        if (!seen.has(lesson.uid)) {
+          seen.add(lesson.uid);
+          merged.push(lesson);
+        }
+      }
+    }
+    return merged;
+  }, [data.timetables]);
+
   const value = useMemo<CalendarContextValue>(
     () => ({
       hydrated,
       data,
+      lessons,
       syncing,
       syncError,
       isHidden,
       hiddenRules: data.hidden,
       hideLesson,
       unhideRule,
+      addClass,
+      removeClass,
       syncNow,
-      completeSetup,
       resetAll,
     }),
-    [hydrated, data, syncing, syncError, isHidden, hideLesson, unhideRule, syncNow, completeSetup, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, syncNow, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

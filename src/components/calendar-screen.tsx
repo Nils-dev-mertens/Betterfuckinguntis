@@ -17,7 +17,7 @@ type ViewMode = 'grid' | 'list';
 
 export function CalendarScreen() {
   const router = useRouter();
-  const { data, syncing, syncNow, isHidden, syncError, hiddenRules } = useCalendar();
+  const { data, lessons, syncing, syncNow, isHidden, syncError, hiddenRules } = useCalendar();
 
   const [weekStart, setWeekStart] = React.useState<Date>(() => weekStartOf(new Date()));
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
@@ -30,8 +30,8 @@ export function CalendarScreen() {
   }, []);
 
   const visibleLessons = React.useMemo(
-    () => data.lessons.filter((lesson) => !isHidden(lesson)),
-    [data.lessons, isHidden]
+    () => lessons.filter((lesson) => !isHidden(lesson)),
+    [lessons, isHidden]
   );
 
   const lessonsForDay = React.useCallback(
@@ -101,6 +101,7 @@ export function CalendarScreen() {
           </Pressable>
           <Pressable
             onPress={() => router.push('/settings')}
+            accessibilityLabel="Open settings"
             className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
             <Settings2 size={15} color="hsl(var(--secondary-foreground))" />
           </Pressable>
@@ -122,7 +123,7 @@ export function CalendarScreen() {
         </View>
       ) : null}
 
-      {data.lessons.length === 0 ? (
+      {lessons.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6">
           <View className="items-center gap-3">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-secondary">
@@ -131,7 +132,8 @@ export function CalendarScreen() {
             <Text className="text-center text-sm text-muted-foreground">
               No classes synced yet.
               {'\n'}
-              Pull “refresh” to fetch the schedule from {data.config?.baseUrl ?? 'WebUntis'}.
+              Pull “refresh” to fetch the schedule from{' '}
+              {data.timetables[0]?.config.baseUrl ?? 'WebUntis'}.
             </Text>
             <Pressable onPress={() => void syncNow()} className="mt-1 rounded-md bg-primary px-4 py-2 active:bg-primary/90">
               <Text className="text-sm font-semibold text-primary-foreground">Sync now</Text>

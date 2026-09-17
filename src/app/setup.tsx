@@ -15,7 +15,9 @@ type Step = 'provider' | 'schoolyear' | 'class';
 
 export default function SetupScreen() {
   const router = useRouter();
-  const { data, completeSetup, syncing } = useCalendar();
+  const { data, addClass, syncing } = useCalendar();
+
+  const addingAnother = data.timetables.length > 0;
 
   const [step, setStep] = React.useState<Step>('provider');
   const [baseUrl, setBaseUrl] = React.useState(DEFAULT_BASE_URL);
@@ -84,11 +86,19 @@ export default function SetupScreen() {
         schoolYear: selectedSchoolYear?.name,
         dateRange: selectedSchoolYear?.dateRange,
       };
-      const ok = await completeSetup(config);
+      const outcome = await addClass(config);
       setSavingClass(null);
-      if (ok) router.replace('/');
+      if (outcome.ok) {
+        if (data.timetables.length > 0 && router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/');
+        }
+      } else {
+        setError(outcome.error ?? 'Could not sync this class.');
+      }
     },
-    [baseUrl, selectedSchoolYear, completeSetup, router]
+    [baseUrl, selectedSchoolYear, addClass, data.timetables.length, router]
   );
 
   const filteredClasses = React.useMemo(() => {
@@ -126,7 +136,9 @@ export default function SetupScreen() {
         <View>
           <Text className="text-lg font-bold">Actually Usable Calendar</Text>
           <Text className="text-xs text-muted-foreground">
-            Step {step === 'provider' ? '1' : step === 'schoolyear' ? '2' : '3'} of 3
+            {addingAnother
+              ? 'Add a class'
+              : `Step ${step === 'provider' ? '1' : step === 'schoolyear' ? '2' : '3'} of 3`}
           </Text>
         </View>
       </View>
@@ -161,9 +173,11 @@ export default function SetupScreen() {
             {loading ? <ActivityIndicator size="small" color="hsl(var(--primary-foreground))" /> : null}
             <Text>Continue</Text>
           </Button>
-          {data.config ? (
+          {data.timetables.length > 0 ? (
             <Text className="mt-4 text-center text-xs text-muted-foreground">
-              Currently watching class {data.config.className}.
+              {addingAnother
+                ? `Watching ${data.timetables.length} class${data.timetables.length === 1 ? '' : 'es'} — picking one adds it to your calendar.`
+                : 'No class synced yet.'}
             </Text>
           ) : null}
         </View>

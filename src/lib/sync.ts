@@ -51,9 +51,35 @@ async function fetchWithTimeout(url: string, timeoutMs = 20_000): Promise<Respon
   }
 }
 
+/** Describe what a response looked like so a bad reply is diagnosable. */
+function describeBody(response: Response, body: string): string {
+  const ctype = response.headers.get('content-type') ?? 'unknown';
+  const head = body.trim().replace(/\s+/g, ' ').slice(0, 100);
+  return `expected JSON, got "${ctype}" (${response.status}): ${head || '(empty body)'}`;
+}
+
+/** Parse a reply as JSON or throw a descriptive error (not a raw parse error). */
+async function jsonOf<T>(response: Response): Promise<T> {
+  const body = await response.text();
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new Error(`The server at ${response.url} was not reachable correctly; ${describeBody(response, body)}`);
+  }
+}
+
+/** The calendar endpoint returns ICS text; reject HTML error pages early. */
+async function icsOf(response: Response): Promise<string> {
+  const body = await response.text();
+  if (body.trim().startsWith('<')) {
+    throw new Error(`The server at ${response.url} sent HTML instead of a calendar; ${describeBody(response, body)}`);
+  }
+  return body;
+}
+
 export async function fetchSchoolyears(baseUrl: string): Promise<SchoolYear[]> {
   const response = await fetchWithTimeout(buildUrl(baseUrl, '/schoolyears'));
-  return (await response.json()) as SchoolYear[];
+  return jsonOf<SchoolYear[]>(response);
 }
 
 export async function fetchClasses(baseUrl: string, range?: DateRange): Promise<SchoolClass[]> {
@@ -63,7 +89,7 @@ export async function fetchClasses(baseUrl: string, range?: DateRange): Promise<
       end: range?.end,
     })
   );
-  return (await response.json()) as SchoolClass[];
+  return jsonOf<SchoolClass[]>(response);
 }
 
 export async function fetchLessons(
@@ -78,8 +104,7 @@ export async function fetchLessons(
       end: range?.end,
     })
   );
-  const ics = await response.text();
-  return parseIcs(ics);
+  return parseIcs(await icsOf(response));
 }
 
 export { DEFAULT_BASE_URL, normalizeBaseUrl };

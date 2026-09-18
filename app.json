@@ -9,9 +9,11 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.actuallyusablecalendar.app"
     },
     "android": {
+      "package": "com.actuallyusablecalendar.app",
       "adaptiveIcon": {
         "backgroundColor": "#111116",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,6 +28,12 @@
     },
     "splash": {
       "backgroundColor": "#111116"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/actually-usable-calendar"
     },
     "plugins": [
       "expo-router",
@@ -42,6 +50,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c39a97ae-7428-4071-b781-0dbdb40e7915"
+      }
     }
   }
 }

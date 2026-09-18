@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
@@ -20,6 +21,7 @@ import { countHiddenForRule } from '@/lib/hidden';
 import { displayBaseUrl } from '@/lib/sync';
 import { downloadLessonsCsv } from '@/lib/csv';
 import { downloadLessonsIcs } from '@/lib/ics-export';
+import { checkForUpdate, updatesSupported } from '@/lib/updates';
 import type { SyncConfig } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
@@ -88,6 +90,17 @@ export default function SettingsScreen() {
   const removable = !syncing;
   // Only clear the status bar on native; web gets no extra top gap.
   const insets = useSafeAreaInsets();
+
+  const [checkingUpdate, setCheckingUpdate] = React.useState(false);
+  const [updateMessage, setUpdateMessage] = React.useState<string | null>(null);
+
+  const runUpdateCheck = React.useCallback(async () => {
+    setCheckingUpdate(true);
+    setUpdateMessage(null);
+    const result = await checkForUpdate();
+    setUpdateMessage(result.message);
+    setCheckingUpdate(false);
+  }, []);
 
   return (
     <View className="flex-1 bg-background">
@@ -265,12 +278,31 @@ export default function SettingsScreen() {
         ListFooterComponent={
           <View className="mt-2">
             <Separator className="mb-4" />
+            {updatesSupported() ? (
+              <View className="mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={checkingUpdate}
+                  onPress={() => void runUpdateCheck()}>
+                  {checkingUpdate ? (
+                    <ActivityIndicator size="small" color="hsl(var(--foreground))" />
+                  ) : (
+                    <RefreshCw size={14} color="hsl(var(--foreground))" />
+                  )}
+                  <Text>Check for updates</Text>
+                </Button>
+                {updateMessage ? (
+                  <Text className="mt-2 text-center text-xs text-muted-foreground">{updateMessage}</Text>
+                ) : null}
+              </View>
+            ) : null}
             <Button variant="destructive" size="sm" onPress={confirmReset}>
               <Wrench size={14} color="hsl(var(--destructive-foreground))" />
               <Text>Clear all data</Text>
             </Button>
             <Text className="mt-4 text-center text-xs text-muted-foreground">
-              Actually Usable Calendar · powered by WebUntis
+              Actually Usable Calendar v{Constants.expoConfig?.version ?? '?'} · powered by WebUntis
             </Text>
           </View>
         }

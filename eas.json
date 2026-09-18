@@ -1,0 +1,26 @@
+{
+  "cli": {
+    "version": ">= 13.0.0"
+  },
+  "build": {
+    // Installable APK for direct download / sideloading (no store account needed).
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal"
+    },
+    // AAB for the Google Play Store.
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "distribution": "store"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

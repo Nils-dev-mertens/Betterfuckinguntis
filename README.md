@@ -1,18 +1,29 @@
 # Actually Usable Calendar
 
-A school timetable app: syncs from the [AP-WebUntisToICS-Node](https://github.com/ap-laboratoria/AP-WebUntisToICS-Node) server, stores everything offline, and lets you remove any class — hidden for all future weeks.
+A school timetable app for AP Hogeschool students: fetches lessons **directly from the WebUntis REST API** (the same source the [AP-WebUntisToICS-Node](https://github.com/Viovyx/AP-WebUntisToICS-Node) server uses), stores everything offline, and stays out of your way.
 
-- **React Native + Expo SDK 57** (expo-router) and **bun**
-- **React Native Reusables** (RNR) components + **NativeWind v4**, dark theme first
+- **React Native + Expo SDK 57** (expo-router), **bun**
+- **React Native Reusables** (RNR) components + **NativeWind v4**, dark theme
 - Syncs once, then works fully offline (AsyncStorage)
-- Multi-week mode / agenda view, hide-and-restore per class
+- **No server needed on mobile** — Android/iOS call WebUntis directly
+
+## Features
+
+- **3 / 5 / 7-day grid + agenda list** — columns always fit the screen width; the full-week view uses compact cards. Every grid mode has an hour axis with a red "now" bubble, and auto-scrolls to the current time on open.
+- **Now & Next banner** — the lesson in progress (with minutes left) and the next one up, tappable for details.
+- **Multiple classes** — watch several classes (even across school years), view them combined (default) or filter to one with the chip row.
+- **Manual lessons** — add your own lessons with date chips and time steppers, optionally repeated weekly; delete a single lesson, a whole series, or from a date onward. Synced lessons can be hidden instead (per weekly slot, restorable in Settings).
+- **ICS + CSV export** — share your timetable as a calendar file (Google Calendar, ICSx⁵, …) or spreadsheet.
+- **School-year aware** — every class belongs to a year (Sept–Sept); the year is shown while picking classes and in Settings, and empty states point you there when data is missing.
 
 ## Setup
 
 ```sh
 bun install
-bun start              # dev server (scan QR for the Expo Go / dev build)
+bun start              # dev server (scan QR for Expo Go / dev build)
 ```
+
+The first launch walks you through: WebUntis server → school year → class.
 
 ## Web
 
@@ -21,35 +32,74 @@ bun run web:build      # expo export --platform web  → dist/
 bun run web:serve      # serves dist/ on http://localhost:8080
 ```
 
-The web app talks to the WebUntis provider through a same-origin proxy at
-`/proxy?url=<encoded>` (the provider sends no CORS headers, so the proxy is
-required in the browser). Android/iOS hit the provider directly.
+Browsers require CORS preflight approval for the API's custom
+`anonymous-school` header, which WebUntis does not grant. The web build
+therefore goes through the same-origin proxy at `/proxy?url=<encoded>`
+(which forwards that header) served by `web:serve`. Running under `bun start`
+alone has no proxy — you'll get HTML instead of JSON.
+Android/iOS are unaffected and hit the API directly.
 
 ## Data source
+
+Base URL (the `API_BASE_URL` from the reference project's `.env.example`):
+
+```
+https://ap.webuntis.com/WebUntis/api/rest/view/v1
+```
+
+The school tenant is selected with the `anonymous-school: ap` request header.
+Responses are cached in memory with the reference server's TTLs: school
+years / class lists for 7 days, timetable entries for 15 minutes.
 
 | Endpoint | Used for |
 | --- | --- |
 | `GET /schoolyears` | available school years |
-| `GET /classes?start=&end=` | class list for a year |
-| `GET /calendar?class=<id>&start=&end=` | ICS timetable for a class |
+| `GET /app/data` | current school year (default date range) |
+| `GET /timetable/filter?resourceType=CLASS&start=&end=` | class list for a year |
+| `GET /timetable/entries?resourceType=CLASS&start=&end=&resources=<id>` | timetable entries |
 
-The default server URL is `https://ap.webuntis.viovyx.com`; you can point to
-your own instance in the in-app Setup screen.
+Lessons are mapped from the raw grid entries (positions 1–7 → subject /
+teachers / rooms / info / classes) the same way the reference server does,
+including merging same-slot lessons and subject filtering (hidden subjects
+are excluded at sync time).
+
+## Builds & updates
+
+The app is distributed as a self-hosted APK: download it from the website,
+install once, and receive JS-only fixes silently via [EAS Update](https://docs.expo.dev/eas-update/introduction/)
+(no reinstall). Native changes require a new APK; the `fingerprint`
+runtime-version policy guarantees devices only get compatible updates.
+
+| Pipeline | Trigger | Output |
+| --- | --- | --- |
+| `update.yml` | push to `main` | EAS OTA update (JS-only, typechecked first) |
+| `release.yml` | tag `v*.*.*` | APK attached to a GitHub Release |
+
+Both need an `EXPO_TOKEN` repo secret (create at expo.dev/settings/access-tokens).
+
+Manual equivalents:
+
+```sh
+eas update --auto --branch production                     # push an OTA update
+eas build -p android --profile apk --local               # build APK locally
+eas build -p android --profile apk                       # build on EAS cloud
+```
+
+In-app, Settings → "Check for updates" fetches and applies OTA updates
+immediately; otherwise they apply on the next launch.
 
 ## Commands
 
 ```sh
-bunx tsc --noEmit        # typecheck (app)
-bunx tsc -p server       # typecheck (web server)
-bun run typecheck        # both
+bun run typecheck        # typecheck app + server
 bunx expo run:android    # native build
 ```
 
 ## Layout
 
 - `src/app/` — routes: setup wizard, calendar, settings
-- `src/components/` — week grid, agenda, lesson sheet, header
-- `src/lib/` — data layer: ICS parser, sync, storage, hidden-rule logic
-- `src/context/calendar-context.tsx` — app state + persistence
+- `src/components/` — week grid (3/5/7-day), agenda, now banner, lesson & add-lesson sheets
+- `src/lib/` — data layer: WebUntis client + mappers (`webuntis.ts`), sync, storage, ICS/CSV export, hidden-rule logic
+- `src/context/calendar-context.tsx` — app state, repeat expansion, persistence
 - `src/components/ui/` — RNR primitives
-- `server/` — static web server with the CORS proxy for the provider
+- `server/` — static web server with the CORS proxy (web only; mobile needs no server)

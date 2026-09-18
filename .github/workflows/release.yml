@@ -1,0 +1,53 @@
+name: release
+
+# Build a sideloadable APK whenever a version tag is pushed (v1.0.1, ...).
+# The APK is attached to a GitHub Release, so the website (or any user) can
+# link to a stable, permanent download per version.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Add the EXPO_TOKEN secret (expo.dev/settings/access-tokens) to this repo."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build APK (local, no EAS queue)
+        run: eas build --platform android --profile apk --local --non-interactive --output app-release.apk
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app-release.apk
+          generate_release_notes: true

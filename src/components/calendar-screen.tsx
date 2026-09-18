@@ -1,7 +1,8 @@
 import { addDays, addWeeks, format, isSameDay } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, PanResponder, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Settings2, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
 import { CalendarHeader } from '@/components/calendar-header';
 import { LessonSheet } from '@/components/lesson-sheet';
@@ -31,6 +32,7 @@ const SPANS: { key: ViewMode; label: string }[] = [
 
 export function CalendarScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { data, lessons, syncing, syncNow, isHidden, syncError, hiddenRules, addLesson } = useCalendar();
 
   /**
@@ -114,8 +116,28 @@ export function CalendarScreen() {
 
   const backToToday = React.useCallback(() => setAnchor(new Date()), []);
 
+  /**
+   * Horizontal swipe navigates prev/next (a window in 3d/5d, a week in
+   * Week/List). Only claims clearly horizontal gestures so vertical
+   * scrolling in the grid and agenda keeps working untouched.
+   */
+  const swipeResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+        onPanResponderRelease: (_event, gesture) => {
+          if (gesture.dx <= -30) move(1);
+          else if (gesture.dx >= 30) move(-1);
+        },
+      }),
+    [move]
+  );
+
   return (
-    <View className="flex-1 bg-background">
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}>
       <CalendarHeader
         currentWeek={weekStartOf(anchor)}
         label={
@@ -243,8 +265,9 @@ export function CalendarScreen() {
         <NowBanner lessons={visibleLessons} now={now} onPressLesson={setSelectedLesson} />
       ) : null}
 
-      {lessons.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
+      <View style={{ flex: 1 }} {...swipeResponder.panHandlers}>
+        {lessons.length === 0 ? (
+          <View className="flex-1 items-center justify-center px-6">
           <View className="items-center gap-3">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-secondary">
               <EyeOff size={24} color="hsl(var(--muted-foreground))" />
@@ -295,6 +318,7 @@ export function CalendarScreen() {
           onPressLesson={setSelectedLesson}
         />
       )}
+      </View>
 
       <LessonSheet lesson={selectedLesson} onClose={() => setSelectedLesson(null)} />
       <AddLessonSheet isOpen={showAddLesson} onClose={() => setShowAddLesson(false)} onAdd={addLesson} />

@@ -4,8 +4,10 @@ import {
   View,
   TextInput,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
+  StyleSheet,
   ActivityIndicator,
   Pressable,
 } from 'react-native';
@@ -117,12 +119,24 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
   };
 
   return (
-    <View className="flex-1" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    // Transparent Modal like the lesson sheet: guarantees the overlay sits
+    // above everything (including the status bar on Android) and the scrim
+    // can never be lost to class-resolution quirks — hence inline styles.
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      statusBarTranslucent={Platform.OS === 'android'}
+      onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-        style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
-        <Pressable onPress={onClose} className="flex-1" accessibilityLabel="Close" />
+        className="flex-1">
+        <Pressable
+          onPress={onClose}
+          accessibilityLabel="Close"
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.65)' }]}
+        />
+        <View className="flex-1 justify-end">
         <View className="rounded-t-2xl border-t border-border bg-card px-4 pb-6 pt-3">
           <View className="mb-3 flex-row items-center justify-between">
             <Text className="text-lg font-bold">Add lesson</Text>
@@ -267,7 +281,8 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
             </View>
           </ScrollView>
         </View>
+        </View>
       </KeyboardAvoidingView>
-    </View>
+    </Modal>
   );
 }

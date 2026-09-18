@@ -30,7 +30,7 @@ jobs:
       - name: Deploy
         run: |
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.TS_USER }}@${{ secrets.TS_HOST }} "
-          cd /home/${{ secrets.TS_USER }}/cybertestgitbook/Desktop/actually-usable-calendar/
+          cd /home/${{ secrets.TS_USER }}/Desktop/actually-usable-calendar/
           git checkout main
           git pull
           docker build -t calendar-site .

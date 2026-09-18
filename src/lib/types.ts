@@ -35,6 +35,10 @@ export interface Lesson {
   classes: string[];
   /** Whether this lesson was created manually (not from server sync) */
   manual?: boolean;
+  /** Manual lessons only: repeat weekly on the same weekday until `repeatUntil` */
+  repeat?: 'none' | 'weekly';
+  /** ISO date (YYYY-MM-DD) of the last occurrence, inclusive; absent = repeat forever */
+  repeatUntil?: string;
 }
 
 /** A rule that hides one recurring weekly class slot, now and in future weeks. */
@@ -55,7 +59,7 @@ export interface HiddenRule {
 }
 
 export interface SyncConfig {
-  /** Base URL of the AP-WebUntisToICS provider, e.g. https://ap.webuntis.viovyx.com */
+  /** API root of the WebUntis server, e.g. https://ap.webuntis.com/WebUntis/api/rest/view/v1 */
   baseUrl: string;
   classId: number;
   className: string;

@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Modal, Pressable, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, View } from 'react-native';
 import { useCalendar } from '@/context/calendar-context';
 import { lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
 import { subjectColor } from '@/lib/colors';
@@ -15,7 +15,7 @@ interface LessonSheetProps {
 }
 
 export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
-  const { isHidden, hideLesson, unhideRule } = useCalendar();
+  const { isHidden, hideLesson, unhideRule, removeLesson, removeLessonOccurrence } = useCalendar();
 
   if (!lesson) return null;
   const hidden = isHidden(lesson);
@@ -24,6 +24,43 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
   const { start } = lessonMinutes(lesson);
   const hh = String(Math.floor(start / 60)).padStart(2, '0');
   const mm = String(start % 60).padStart(2, '0');
+  // Manual lessons can be deleted; synced ones can only be hidden.
+  const isManual = Boolean(lesson.manual);
+  const isSeriesBase = Boolean(lesson.manual && lesson.repeat === 'weekly');
+  const isRepeatedOccurrence = Boolean(lesson.uid.includes('#'));
+
+  const confirmDeleteSeries = () => {
+    const message = `Delete "${lesson.subject}" and all its future weekly repeats?`;
+    const run = () => {
+      void removeLesson(lesson.uid.split('#')[0]);
+      onClose();
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) run();
+    } else {
+      Alert.alert('Delete series?', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: run },
+      ]);
+    }
+  };
+
+  const confirmDeleteOccurrence = () => {
+    const message =
+      'This removes the series from this week onward. Earlier weeks stay as they are.';
+    const run = () => {
+      void removeLessonOccurrence(lesson);
+      onClose();
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) run();
+    } else {
+      Alert.alert('Delete from here on?', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: run },
+      ]);
+    }
+  };
 
   return (
     <Modal
@@ -73,7 +110,36 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
 
             <Separator className="my-1" />
 
-            {hidden ? (
+            {isManual ? (
+              <>
+                <Text className="text-center text-xs text-muted-foreground">
+                  You created this lesson, so you can delete it. Synced classes are hidden instead
+                  of deleted.
+                </Text>
+                {isSeriesBase ? (
+                  <View className="gap-2">
+                    {isRepeatedOccurrence ? (
+                      <Button variant="outline" size="sm" onPress={confirmDeleteOccurrence}>
+                        <Text>Delete this and future repeats</Text>
+                      </Button>
+                    ) : null}
+                    <Button variant="destructive" size="sm" onPress={confirmDeleteSeries}>
+                      <Text>Delete series</Text>
+                    </Button>
+                  </View>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onPress={() => {
+                      void removeLesson(lesson.uid);
+                      onClose();
+                    }}>
+                    <Text>Delete lesson</Text>
+                  </Button>
+                )}
+              </>
+            ) : hidden ? (
               <View className="gap-2">
                 <Text className="text-center text-sm font-semibold text-primary">
                   This class (every week) is hidden.
@@ -87,11 +153,13 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
                 <Text>Hide this class in all weeks</Text>
               </Button>
             )}
-            <Text className="text-center text-xs text-muted-foreground">
-              {hidden
-                ? 'This hides the matching recurring slot only in this calendar. It will stay hidden for future weeks.'
-                : 'Hides every matching recurring weekly slot — now and in future weeks. Manage from Settings.'}
-            </Text>
+            {!isManual ? (
+              <Text className="text-center text-xs text-muted-foreground">
+                {hidden
+                  ? 'This hides the matching recurring slot only in this calendar. It will stay hidden for future weeks.'
+                  : 'Hides every matching recurring weekly slot — now and in future weeks. Manage from Settings.'}
+              </Text>
+            ) : null}
           </CardContent>
         </Card>
       </View>

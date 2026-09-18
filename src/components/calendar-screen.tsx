@@ -1,27 +1,41 @@
-import { addDays, addWeeks, format, isSameWeek, subWeeks } from 'date-fns';
+import { addDays, addWeeks, format, isSameDay } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { ChevronLeft, ChevronRight, List, Settings2, CalendarDays, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Settings2, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
 import { CalendarHeader } from '@/components/calendar-header';
 import { LessonSheet } from '@/components/lesson-sheet';
+import { NowBanner } from '@/components/now-banner';
 import { WeekAgenda } from '@/components/week-agenda';
 import { WeekGrid } from '@/components/week-grid';
 import { AddLessonSheet } from '@/components/add-lesson-sheet';
 import { useCalendar } from '@/context/calendar-context';
-import { lessonOverlapsRange, formatWeekLabel, weekDays, weekStartOf } from '@/lib/time';
+import { weekDays, weekStartOf } from '@/lib/time';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
-type ViewMode = 'grid' | 'list';
+type ViewMode = '3d' | '5d' | 'grid' | 'list';
+
+const SPANS: { key: ViewMode; label: string }[] = [
+  { key: '3d', label: '3d' },
+  { key: '5d', label: '5d' },
+  { key: 'grid', label: 'Week' },
+  { key: 'list', label: 'List' },
+];
 
 export function CalendarScreen() {
   const router = useRouter();
   const { data, lessons, syncing, syncNow, isHidden, syncError, hiddenRules, addLesson } = useCalendar();
 
-  const [weekStart, setWeekStart] = React.useState<Date>(() => weekStartOf(new Date()));
-  const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
+  /**
+   * The only navigation state: any day the user is looking at. The displayed
+   * week always starts on Monday (derived via weekStartOf), so it can never
+   * drift — previously 3d/5d stepping mutated `weekStart` directly and the
+   * Week view could open on e.g. a Thursday.
+   */
+  const [anchor, setAnchor] = React.useState<Date>(() => new Date());
+  const [viewMode, setViewMode] = React.useState<ViewMode>('5d');
   const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
   const [showAddLesson, setShowAddLesson] = React.useState(false);
   const [now, setNow] = React.useState(() => new Date());
@@ -47,53 +61,88 @@ export function CalendarScreen() {
     [visibleLessons]
   );
 
-  const days = React.useMemo(() => weekDays(weekStart), [weekStart]);
-  const weekHasLesson = visibleLessons.some((lesson) =>
-    lessonOverlapsRange(lesson.start, lesson.end, weekStart.getTime(), addDays(weekStart, 7).getTime())
+  const days = React.useMemo(() => weekDays(weekStartOf(anchor)), [anchor]);
+
+  /**
+   * Days shown by the current view mode. 3d/5d roll from today, wrapping
+   * into next week when the window would leave the displayed week.
+   */
+  const shownDays = React.useMemo(() => {
+    if (viewMode === 'grid' || viewMode === 'list') return days;
+    const count = viewMode === '3d' ? 3 : 5;
+    const todayIndex = days.findIndex((day) => isSameDay(day, now));
+    const anchorIndex = days.findIndex((day) => isSameDay(day, anchor));
+    const index = anchorIndex >= 0 ? anchorIndex : todayIndex >= 0 ? todayIndex : 0;
+    return Array.from({ length: count }, (_, i) => addDays(days[index] ?? days[0], i));
+  }, [viewMode, days, now, anchor]);
+
+  /**
+   * Prev/next: weeks in Week/List; whole windows in 3d/5d. The anchor moves
+   * by days, and Monday is re-derived from it every render, so stepping
+   * across a week boundary keeps the Week view Monday-based.
+   */
+  const move = React.useCallback(
+    (delta: number) => {
+      if (viewMode === 'grid' || viewMode === 'list') {
+        setAnchor((current) => addWeeks(current, delta));
+        return;
+      }
+      setAnchor((current) => addDays(current, delta * (viewMode === '3d' ? 3 : 5)));
+    },
+    [viewMode]
   );
 
-  const moveWeek = React.useCallback((delta: number) => {
-    setWeekStart((current) => (delta < 0 ? subWeeks(current, 1) : addWeeks(current, 1)));
-  }, []);
+  const isTodayShown = shownDays.some((day) => isSameDay(day, now));
 
-  const isThisWeek = isSameWeek(weekStart, now, { weekStartsOn: 1 });
+  const backToToday = React.useCallback(() => setAnchor(new Date()), []);
 
   return (
     <View className="flex-1 bg-background">
-      <CalendarHeader currentWeek={weekStart} onPrev={() => moveWeek(-1)} onNext={() => moveWeek(1)} />
+      <CalendarHeader
+        currentWeek={weekStartOf(anchor)}
+        label={
+          viewMode === '3d' || viewMode === '5d'
+            ? `${format(shownDays[0], 'EEE d MMM')} – ${format(shownDays[shownDays.length - 1], 'EEE d MMM')}`
+            : undefined
+        }
+        caption={
+          syncing
+            ? 'Syncing…'
+            : data.lastSyncedAt
+              ? `Synced ${format(data.lastSyncedAt, 'd MMM · HH:mm')}`
+              : 'Not synced yet'
+        }
+        onPrev={() => move(-1)}
+        onNext={() => move(1)}
+      />
 
-      {/* Toolbar */}
-      <View className="flex-row items-center justify-between px-4 pb-2">
-        <View className="flex-row items-center gap-2">
-          <Pressable
-            onPress={() => setViewMode('grid')}
-            className={cn(
-              'h-8 w-8 items-center justify-center rounded-md',
-              viewMode === 'grid' ? 'bg-primary' : 'bg-secondary active:bg-accent'
-            )}>
-            <CalendarDays size={16} color={viewMode === 'grid' ? 'hsl(var(--primary-foreground))' : 'hsl(var(--secondary-foreground))'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setViewMode('list')}
-            className={cn(
-              'h-8 w-8 items-center justify-center rounded-md',
-              viewMode === 'list' ? 'bg-primary' : 'bg-secondary active:bg-accent'
-            )}>
-            <List size={16} color={viewMode === 'list' ? 'hsl(var(--primary-foreground))' : 'hsl(var(--secondary-foreground))'} />
-          </Pressable>
+      {/* Toolbar: spans left, actions right (synced time lives in the header) */}
+      <View className="flex-row items-center justify-between gap-2 px-4 pb-2">
+        <View className="flex-row items-center gap-1 rounded-md border border-border bg-secondary p-0.5">
+          {SPANS.map((span) => (
+            <Pressable
+              key={span.key}
+              onPress={() => setViewMode(span.key)}
+              className={cn(
+                'h-7 rounded px-2.5 items-center justify-center',
+                viewMode === span.key ? 'bg-primary' : 'active:bg-accent'
+              )}>
+              <Text
+                className={cn(
+                  'text-xs font-semibold',
+                  viewMode === span.key ? 'text-primary-foreground' : 'text-muted-foreground'
+                )}>
+                {span.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
-        <View className="flex-row items-center gap-2">
-          {data.lastSyncedAt ? (
-            <Text className="text-xs text-muted-foreground">
-              synced {format(data.lastSyncedAt, 'd MMM · HH:mm')}
-            </Text>
-          ) : (
-            <Text className="text-xs text-muted-foreground">not synced yet</Text>
-          )}
+        <View className="flex-row items-center gap-1.5">
           <Pressable
             onPress={() => void syncNow()}
             disabled={syncing}
+            accessibilityLabel="Sync now"
             className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
             {syncing ? (
               <ActivityIndicator size="small" color="hsl(var(--secondary-foreground))" />
@@ -103,6 +152,7 @@ export function CalendarScreen() {
           </Pressable>
           <Pressable
             onPress={() => setShowAddLesson(true)}
+            accessibilityLabel="Add lesson"
             className="h-8 w-8 items-center justify-center rounded-md bg-primary active:bg-primary/90">
             <Plus size={15} color="hsl(var(--primary-foreground))" />
           </Pressable>
@@ -115,9 +165,9 @@ export function CalendarScreen() {
         </View>
       </View>
 
-      {!isThisWeek && (
+      {!isTodayShown && (
         <Pressable
-          onPress={() => setWeekStart(weekStartOf(new Date()))}
+          onPress={backToToday}
           className="mx-4 mb-2 flex-row items-center gap-1.5 self-start rounded-md border border-primary/40 bg-primary/10 px-3 py-1">
           <Text className="text-xs font-medium text-primary">Today</Text>
           <ChevronRight size={12} color="hsl(var(--primary))" />
@@ -130,6 +180,10 @@ export function CalendarScreen() {
         </View>
       ) : null}
 
+      {lessons.length > 0 && isTodayShown ? (
+        <NowBanner lessons={visibleLessons} now={now} onPressLesson={setSelectedLesson} />
+      ) : null}
+
       {lessons.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6">
           <View className="items-center gap-3">
@@ -137,20 +191,20 @@ export function CalendarScreen() {
               <EyeOff size={24} color="hsl(var(--muted-foreground))" />
             </View>
             <Text className="text-center text-sm text-muted-foreground">
-              No classes synced yet.
-              {'\n'}
-              Pull “refresh” to fetch the schedule from{' '}
-              {data.timetables[0]?.config.baseUrl ?? 'WebUntis'}.
+              No lessons to show. If this class should have data, check in Settings that the class
+              belongs to the school year you want (each year runs Sept–Sept).
             </Text>
             <Pressable onPress={() => void syncNow()} className="mt-1 rounded-md bg-primary px-4 py-2 active:bg-primary/90">
               <Text className="text-sm font-semibold text-primary-foreground">Sync now</Text>
             </Pressable>
           </View>
         </View>
-      ) : !weekHasLesson ? (
+      ) : !shownDays.some((day) => lessonsForDay(day).length > 0) ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-sm text-muted-foreground">
-            No classes in the week of {formatWeekLabel(weekStart)}.
+            No classes in the {viewMode === 'list' ? 'week' : `${shownDays.length} days`} shown.
+            {'\n'}If you expected lessons here, check that your class is from the school year you
+            want (Settings shows which year it belongs to).
           </Text>
         </View>
       ) : viewMode === 'grid' ? (
@@ -159,6 +213,15 @@ export function CalendarScreen() {
           lessonsForDay={lessonsForDay}
           today={now}
           onPressLesson={setSelectedLesson}
+          scrollNowIntoView={isTodayShown}
+        />
+      ) : viewMode === '3d' || viewMode === '5d' ? (
+        <WeekGrid
+          days={shownDays}
+          lessonsForDay={lessonsForDay}
+          today={now}
+          onPressLesson={setSelectedLesson}
+          scrollNowIntoView={isTodayShown}
         />
       ) : (
         <WeekAgenda
@@ -172,7 +235,7 @@ export function CalendarScreen() {
       <LessonSheet lesson={selectedLesson} onClose={() => setSelectedLesson(null)} />
       <AddLessonSheet isOpen={showAddLesson} onClose={() => setShowAddLesson(false)} onAdd={addLesson} />
 
-      {hiddenRules.length > 0 && viewMode === 'grid' && (
+      {hiddenRules.length > 0 && (
         <View className="absolute bottom-3 right-3 flex-row items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg shadow-black/40">
           <EyeOff size={12} color="hsl(var(--muted-foreground))" />
           <Text className="text-[11px] text-muted-foreground">

@@ -4,6 +4,14 @@ import type { AppData, ClassTimetable, Lesson } from './types';
 const STORAGE_KEY = 'auch:app:v2';
 const LEGACY_KEY = 'auch:app:v1';
 
+/**
+ * The old provider URL of the retired AP-WebUntisToICS ICS server. Configs
+ * pointing there are migrated to the direct WebUntis API root; lesson data
+ * is kept and refreshed on the next sync.
+ */
+const LEGACY_PROVIDER_URL = 'ap.webuntis.viovyx.com';
+const API_ROOT = '/WebUntis/api/rest/view/v1';
+
 export const EMPTY_DATA: AppData = {
   timetables: [],
   manualLessons: [],
@@ -17,8 +25,26 @@ function normalizeTimetable(value: unknown): ClassTimetable | null {
   const config = entry.config as ClassTimetable['config'] | undefined;
   if (!config || typeof config.classId !== 'number') return null;
   return {
-    config,
+    config: migrateConfig(config),
     lessons: Array.isArray(entry.lessons) ? entry.lessons : [],
+  };
+}
+
+function migrateConfig(config: ClassTimetable['config']): ClassTimetable['config'] {
+  const url = config.baseUrl.toLowerCase();
+  if (url.includes(LEGACY_PROVIDER_URL)) {
+    return { ...config, baseUrl: `https://ap.webuntis.com${API_ROOT}` };
+  }
+  if (!url.includes('webuntis.com') && !url.includes(API_ROOT)) {
+    // Unknown base URL from an older build; keep it untouched.
+    return config;
+  }
+  // A bare tenant root (e.g. https://ap.webuntis.com) gets the API path.
+  return {
+    ...config,
+    baseUrl: /\/WebUntis\/api\/rest\/view\/v1$/i.test(config.baseUrl)
+      ? config.baseUrl
+      : `${config.baseUrl.replace(/\/+$/, '')}${API_ROOT}`,
   };
 }
 

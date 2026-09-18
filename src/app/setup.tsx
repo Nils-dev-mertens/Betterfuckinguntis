@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Search, School, Check, RefreshCw } from 'lucide-react-native';
 import { useCalendar } from '@/context/calendar-context';
 import { DEFAULT_BASE_URL, fetchClasses, fetchSchoolyears, normalizeBaseUrl } from '@/lib/sync';
@@ -28,6 +29,15 @@ export default function SetupScreen() {
   const [savingClass, setSavingClass] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  // Only clear the status bar on native; web gets no extra top gap.
+  const insets = useSafeAreaInsets();
+
+  /** Shown while picking a class so the year context is always visible. */
+  const yearHint = selectedSchoolYear
+    ? selectedSchoolYear.name
+    : schoolyears
+      ? 'Current school year (server default)'
+      : null;
 
   const goBack = React.useCallback(() => {
     setError(null);
@@ -50,7 +60,7 @@ export default function SetupScreen() {
       setSchoolyears(result);
       setStep('schoolyear');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not reach the calendar server.');
+      setError(e instanceof Error ? e.message : 'Could not reach the WebUntis server.');
     } finally {
       setLoading(false);
     }
@@ -126,7 +136,9 @@ export default function SetupScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-background"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View className="flex-row items-center gap-3 px-4 pb-2 pt-14">
+      <View
+        className="flex-row items-center gap-3 px-4 pb-2 pt-3"
+        style={{ paddingTop: Math.max(insets.top, 12) }}>
         <Pressable
           onPress={goBack}
           accessibilityLabel="Back"
@@ -139,6 +151,7 @@ export default function SetupScreen() {
             {addingAnother
               ? 'Add a class'
               : `Step ${step === 'provider' ? '1' : step === 'schoolyear' ? '2' : '3'} of 3`}
+            {yearHint && step === 'class' ? ` · ${yearHint}` : ''}
           </Text>
         </View>
       </View>
@@ -147,10 +160,10 @@ export default function SetupScreen() {
 
       {step === 'provider' && (
         <View className="px-4 py-6">
-          <Text className="text-sm font-semibold">Calendar server</Text>
+          <Text className="text-sm font-semibold">WebUntis server</Text>
           <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-            Your school timetable comes from the AP-WebUntisToICS service. Keep the public server, or
-            point to your own instance.
+            Your timetable is fetched straight from the WebUntis API of your school. Keep the default
+            AP tenant, or point to another tenant's API root.
           </Text>
           <Input
             value={baseUrl}
@@ -158,7 +171,7 @@ export default function SetupScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            placeholder="https://ap.webuntis.viovyx.com"
+            placeholder="https://ap.webuntis.com/WebUntis/api/rest/view/v1"
             className="mt-4"
             onSubmitEditing={() => void loadSchoolyears()}
           />
@@ -193,7 +206,8 @@ export default function SetupScreen() {
             <>
               <Text className="text-sm font-semibold">School year</Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                Pick the year whose timetable you need.
+                Pick the year whose timetable you need. A school year runs from September to the
+                September of the next year, and every class belongs to exactly one year.
               </Text>
               <View className="mt-4 gap-2">
                 <SchoolyearRow
@@ -224,10 +238,23 @@ export default function SetupScreen() {
       )}
 
       {step === 'class' && (
-        <View className="flex-1 px-4 pt-6">
-          <Text className="text-sm font-semibold">Pick your class</Text>
+        <View className="flex-1 px-4 pt-4">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm font-semibold">Pick your class</Text>
+            {selectedSchoolYear ? (
+              <View className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1">
+                <Text className="text-xs font-bold text-primary">
+                  {selectedSchoolYear.name} · {selectedSchoolYear.dateRange.start.slice(0, 4)}/
+                  {selectedSchoolYear.dateRange.end.slice(2, 4)}
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-xs text-muted-foreground">Current school year</Text>
+            )}
+          </View>
           <Text className="mt-1 text-sm text-muted-foreground">
-            Tapping a class syncs its schedule to this device for offline use.
+            Tapping a class syncs its schedule to this device for offline use. Classes only exist
+            within one school year (Sept–Sept); switch the year above if yours is missing.
           </Text>
 
           <View className="mt-4 flex-row items-center gap-2 rounded-md border border-border bg-secondary px-3">

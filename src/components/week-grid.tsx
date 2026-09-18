@@ -1,6 +1,6 @@
 import { isSameDay, format } from 'date-fns';
-import { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { subjectColor } from '@/lib/colors';
 import { minutesOfDay } from '@/lib/time';
 import type { Lesson } from '@/lib/types';
@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
 const HOUR_HEIGHT = 52;
-const TIME_AXIS_WIDTH = 46;
 const DEFAULT_DAY_START = 7; // 07:00
 const DEFAULT_DAY_END = 20; // 20:00
 
@@ -17,6 +16,8 @@ interface WeekGridProps {
   lessonsForDay: (day: Date) => Lesson[];
   today: Date;
   onPressLesson: (lesson: Lesson) => void;
+  /** Scroll the view so the current time is visible on mount. */
+  scrollNowIntoView?: boolean;
 }
 
 interface PositionedLesson {
@@ -78,30 +79,13 @@ function layoutDay(lessons: Lesson[], dayStartMinutes: number): PositionedLesson
   return positions;
 }
 
-function TimeAxis({ startHour, hoursCount }: { startHour: number; hoursCount: number }) {
-  return (
-    <View style={{ width: TIME_AXIS_WIDTH, flexShrink: 0 }}>
-      {Array.from({ length: hoursCount + 1 }, (_, i) => {
-        const hour = startHour + i;
-        return (
-          <View
-            key={hour}
-            style={{ height: HOUR_HEIGHT, justifyContent: 'flex-start', paddingTop: 2 }}>
-            <Text className="pr-2 text-right text-[11px] tabular-nums text-muted-foreground">
-              {String(hour).padStart(2, '0')}:00
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 function LessonCard({
   position,
+  mini,
   onPress,
 }: {
   position: PositionedLesson;
+  mini: boolean;
   onPress: (lesson: Lesson) => void;
 }) {
   const { lesson, top, height, leftPct, widthPct } = position;
@@ -119,27 +103,33 @@ function LessonCard({
         width: `${widthPct}%`,
         backgroundColor: color.bg,
         borderLeftColor: color.accent,
-        borderLeftWidth: 3,
+        borderLeftWidth: mini ? 2 : 3,
       }}>
-      <View className="px-1.5 py-1">
-        <Text className="text-[12px] font-bold leading-tight" style={{ color: color.text }}>
+      <View className={mini ? 'px-0.5 py-0.5' : 'px-1 py-0.5'}>
+        <Text
+          className={cn(
+            'font-bold leading-tight',
+            mini ? 'text-[9px]' : 'text-[11px]'
+          )}
+          style={{ color: color.text }}
+          numberOfLines={mini ? 2 : 2}>
           {lesson.subject}
-          {lesson.info ? ` · ${lesson.info}` : ''}
         </Text>
-        <Text className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
-          {format(lesson.start, 'HH:mm')} – {format(lesson.end, 'HH:mm')}
+        <Text
+          className={cn(
+            'mt-0.5 leading-tight text-muted-foreground tabular-nums',
+            mini ? 'text-[8px]' : 'text-[9px]'
+          )}>
+          {format(lesson.start, 'HH:mm')}
         </Text>
-        {lesson.locations.length > 0 && (
-          <Text className="text-[10px] leading-tight text-muted-foreground" numberOfLines={1}>
-            {lesson.locations.join(' / ')}
-          </Text>
-        )}
       </View>
     </Pressable>
   );
 }
 
-export function WeekGrid({ days, lessonsForDay, today, onPressLesson }: WeekGridProps) {
+export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowIntoView = false }: WeekGridProps) {
+  const scrollRef = useRef<ScrollView | null>(null);
+
   const { dayStart, dayEnd } = useMemo(() => {
     const minutes: number[] = [];
     for (const day of days) {
@@ -152,13 +142,33 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson }: WeekGrid
     const min = Math.min(...minutes);
     const max = Math.max(...minutes);
     const start = Math.max(0, Math.min(DEFAULT_DAY_START, Math.floor(min / 60) - 1));
-    const end = Math.min(24, Math.max(DEFAULT_DAY_END, Math.ceil(max / 60) + 1));
+    // Bottom edge hugs the last lesson (+1h) but always shows at least 8h,
+    // so early-afternoon days don't end in a tall empty band.
+    const end = Math.min(24, Math.max(Math.ceil(max / 60) + 1, start + 8));
     return { dayStart: start, dayEnd: end };
   }, [days, lessonsForDay]);
 
   const hoursCount = dayEnd - dayStart;
   const dayStartMinutes = dayStart * 60;
-  const isWeb = Platform.OS === 'web';
+  // Full week on a phone is 7 narrow columns: shrink info to the bare
+  // minimum so everything always fits the screen width.
+  const mini = days.length > 5;
+
+  // On open, scroll so the current time sits ~1/3 from the top. The delay
+  // lets the ScrollView finish its initial layout first.
+  useEffect(() => {
+    if (!scrollNowIntoView) return;
+    const todayMinutes = minutesOfDay(new Date());
+    if (todayMinutes < dayStartMinutes || todayMinutes > dayEnd * 60) return;
+    const target = Math.max(
+      0,
+      (todayMinutes - dayStartMinutes) * (HOUR_HEIGHT / 60) - HOUR_HEIGHT * 2
+    );
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: target, animated: false });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [scrollNowIntoView, dayStartMinutes, dayEnd, days.length]);
 
   const renderDay = (day: Date, dayIndex: number) => {
     const isToday = isSameDay(day, today);
@@ -171,24 +181,46 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson }: WeekGrid
       <View
         key={dayKey(day)}
         className={cn(
-          isWeb ? 'min-w-[132px] flex-1' : 'w-[164px] max-w-[164px] min-w-[164px]',
-          'border-l border-border',
+          'min-w-0 flex-1 border-l border-border',
           dayIndex === 0 && 'border-l-0',
           isToday && 'bg-primary/[0.04]'
         )}>
         {/* Day header */}
-        <View className="border-b border-border px-2 py-2">
-          <Text
-            className={cn(
-              'text-xs font-bold uppercase tracking-wide',
-              isToday ? 'text-primary' : 'text-muted-foreground'
-            )}>
-            {format(day, 'EEEE')}
-          </Text>
-          <Text className={cn('text-xl font-extrabold', isToday ? 'text-primary' : 'text-foreground')}>
-            {format(day, 'd')}
-          </Text>
-        </View>
+        {mini ? (
+          <View className="items-center border-b border-border px-0.5 py-1">
+            <Text
+              className={cn(
+                'text-[9px] font-bold uppercase',
+                isToday ? 'text-primary' : 'text-muted-foreground'
+              )}>
+              {format(day, 'EEEEE')}
+            </Text>
+            <Text
+              className={cn(
+                'text-xs font-extrabold leading-tight',
+                isToday ? 'text-primary' : 'text-foreground'
+              )}>
+              {format(day, 'd')}
+            </Text>
+          </View>
+        ) : (
+          <View className="items-center border-b border-border px-1 py-1.5">
+            <Text
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wide',
+                isToday ? 'text-primary' : 'text-muted-foreground'
+              )}>
+              {format(day, 'EEE')}
+            </Text>
+            <Text
+              className={cn(
+                'text-sm font-extrabold leading-tight',
+                isToday ? 'text-primary' : 'text-foreground'
+              )}>
+              {format(day, 'd')}
+            </Text>
+          </View>
+        )}
 
         {/* Body */}
         <View style={{ height: hoursCount * HOUR_HEIGHT }}>
@@ -238,29 +270,25 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson }: WeekGrid
             </>
           )}
           {positions.map((position) => (
-            <LessonCard key={position.lesson.uid} position={position} onPress={onPressLesson} />
+            <LessonCard
+              key={position.lesson.uid}
+              position={position}
+              mini={mini}
+              onPress={onPressLesson}
+            />
           ))}
         </View>
       </View>
     );
   };
 
+  // Columns share the width via flex; no fixed widths, no horizontal scroll.
   return (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 w-full">
-      <View className="flex-row w-full">
-        <TimeAxis startHour={dayStart} hoursCount={hoursCount} />
-        {/* On screen-width displays the days share the full width; on touch
-            devices the columns keep their size and the row scrolls. */}
-        <View className="flex-1 min-w-0 w-full">
-          {isWeb ? (
-            <View className="flex-row w-full">{days.map(renderDay)}</View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-grow-0">
-              <View className="flex-row">{days.map(renderDay)}</View>
-            </ScrollView>
-          )}
-        </View>
-      </View>
+    <ScrollView
+      ref={scrollRef}
+      showsVerticalScrollIndicator={false}
+      className="flex-1 w-full">
+      <View className="w-full flex-row">{days.map(renderDay)}</View>
     </ScrollView>
   );
 }

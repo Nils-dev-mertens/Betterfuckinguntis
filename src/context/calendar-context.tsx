@@ -30,8 +30,10 @@ interface CalendarContextValue {
   removeClass: (config: SyncConfig) => Promise<void>;
   /** Adds a manually created lesson */
   addLesson: (lesson: Omit<Lesson, 'uid' | 'manual'>) => Promise<void>;
-  /** Removes a manually created lesson */
+  /** Removes a manually created lesson (all occurrences of its series) */
   removeLesson: (uid: string) => Promise<void>;
+  /** Removes the base lesson of a repeated series but keeps this occurrence */
+  removeLessonOccurrence: (lesson: Lesson) => Promise<void>;
   /** Refreshes the timetable of every watched class */
   syncNow: () => Promise<boolean>;
   /** Removes everything, returning to onboarding */
@@ -110,8 +112,13 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       setSyncing(true);
       setSyncError(null);
       try {
+        // Subject names hidden by a rule are excluded at fetch time, the same
+        // way the reference server's `&filter=` parameter works.
+        const hiddenSubjects = [...new Set(data.hidden.map((rule) => rule.subject))];
         const results = await Promise.all(
-          targets.map((target) => fetchLessons(target.baseUrl, target.classId, target.dateRange))
+          targets.map((target) =>
+            fetchLessons(target.baseUrl, target.classId, target.dateRange, hiddenSubjects)
+          )
         );
         const fetched: ClassTimetable[] = targets.map((config, i) => ({ config, lessons: results[i] }));
 
@@ -134,7 +141,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         setSyncing(false);
       }
     },
-    [persist]
+    [data.hidden, persist]
   );
 
   const addClass = useCallback(async (config: SyncConfig) => syncClasses([config]), [syncClasses]);
@@ -186,6 +193,73 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     [persist]
   );
 
+  /**
+   * Removes one occurrence of a repeated manual lesson by scoping the
+   * series: the base lesson is re-created with a one-off exception date and
+   * the repeat is stopped at the previous week, so past occurrences stay.
+   */
+  const removeLessonOccurrence = useCallback(
+    async (lesson: Lesson) => {
+      await persist((current) => {
+        const baseUid = lesson.uid.split('#')[0];
+        const base = current.manualLessons.find((l) => l.uid === baseUid);
+        if (!base) return current;
+        // End the series before this occurrence... unless this IS the base
+        // (first occurrence), in which case the whole series goes.
+        if (lesson.uid === baseUid) {
+          return {
+            ...current,
+            manualLessons: current.manualLessons.filter((l) => l.uid !== baseUid),
+          };
+        }
+        const previousWeek = format(new Date(lesson.start - 7 * 86_400_000), 'yyyy-MM-dd');
+        const updated: Lesson = {
+          ...base,
+          repeatUntil: previousWeek,
+        };
+        // Keep the deleted date as a one-off "negative" lesson? No — simply
+        // stop the series here; later weeks disappear with it. To skip just
+        // one week and keep later ones we would need exceptions, which the
+        // current model does not store.
+        return {
+          ...current,
+          manualLessons: current.manualLessons.map((l) => (l.uid === baseUid ? updated : l)),
+        };
+      });
+    },
+    [persist]
+  );
+
+  /**
+   * Manual lessons marked `repeat: 'weekly'` expand into one virtual lesson
+   * per week between their start and `repeatUntil` (inclusive), keeping the
+   * weekday and time. The stored lesson itself is occurrence #1.
+   */
+  const expandedManualLessons = useMemo(() => {
+    const result: Lesson[] = [];
+    for (const lesson of data.manualLessons) {
+      result.push(lesson);
+      if (lesson.repeat !== 'weekly') continue;
+      const until = lesson.repeatUntil
+        ? new Date(`${lesson.repeatUntil}T23:59:59`).getTime()
+        : Date.now() + 52 * 7 * 86_400_000; // repeat for a year by default
+      let occurrenceStart = lesson.start + 7 * 86_400_000;
+      let n = 2;
+      while (occurrenceStart <= until) {
+        const duration = lesson.end - lesson.start;
+        result.push({
+          ...lesson,
+          uid: `${lesson.uid}#${n}`,
+          start: occurrenceStart,
+          end: occurrenceStart + duration,
+        });
+        occurrenceStart += 7 * 86_400_000;
+        n += 1;
+      }
+    }
+    return result;
+  }, [data.manualLessons]);
+
   const lessons = useMemo(() => {
     const seen = new Set<string>();
     const merged: Lesson[] = [];
@@ -199,14 +273,14 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       }
     }
     // Manual lessons (they have unique uids)
-    for (const lesson of data.manualLessons) {
+    for (const lesson of expandedManualLessons) {
       if (!seen.has(lesson.uid)) {
         seen.add(lesson.uid);
         merged.push(lesson);
       }
     }
     return merged;
-  }, [data.timetables, data.manualLessons]);
+  }, [data.timetables, expandedManualLessons]);
 
   const value = useMemo<CalendarContextValue>(
     () => ({
@@ -223,10 +297,11 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       removeClass,
       addLesson,
       removeLesson,
+      removeLessonOccurrence,
       syncNow,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, syncNow, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

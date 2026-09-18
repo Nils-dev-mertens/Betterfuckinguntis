@@ -52,7 +52,14 @@ createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Only http(s) targets are allowed.');
         return;
       }
-      const upstream = await fetch(target, { headers: { 'user-agent': 'actually-usable-calendar' } });
+      // Forward the tenant selector required by the WebUntis view API.
+      const schoolHeader = req.headers['anonymous-school'];
+      const upstream = await fetch(target, {
+        headers: {
+          'user-agent': 'actually-usable-calendar',
+          'anonymous-school': (Array.isArray(schoolHeader) ? schoolHeader[0] : schoolHeader) ?? 'ap',
+        },
+      });
       const body = await upstream.arrayBuffer();
       res.writeHead(upstream.status, {
         'Content-Type': upstream.headers.get('content-type') ?? 'application/octet-stream',

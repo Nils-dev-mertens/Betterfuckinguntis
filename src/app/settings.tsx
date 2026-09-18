@@ -1,17 +1,15 @@
 import { format } from 'date-fns';
-import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
-  Check,
   Clock3,
   EyeOff,
   FileDown,
   Info,
   Layers,
-  Link2,
   Plus,
   RefreshCw,
   Wrench,
@@ -19,40 +17,24 @@ import {
 } from 'lucide-react-native';
 import { useCalendar } from '@/context/calendar-context';
 import { countHiddenForRule } from '@/lib/hidden';
-import { normalizeBaseUrl } from '@/lib/sync';
+import { displayBaseUrl } from '@/lib/sync';
 import { downloadLessonsCsv } from '@/lib/csv';
+import { downloadLessonsIcs } from '@/lib/ics-export';
 import type { SyncConfig } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
-function calendarUrl(config: SyncConfig): string {
-  const params = new URLSearchParams({ class: String(config.classId) });
-  if (config.dateRange) {
-    params.set('start', config.dateRange.start);
-    params.set('end', config.dateRange.end);
-  }
-  return `${normalizeBaseUrl(config.baseUrl)}/calendar?${params.toString()}`;
-}
-
 export default function SettingsScreen() {
   const router = useRouter();
   const { data, lessons, syncing, syncNow, unhideRule, resetAll, hiddenRules, removeClass, isHidden } =
     useCalendar();
-  const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null);
 
   const visibleLessons = React.useMemo(
     () => lessons.filter((lesson) => !isHidden(lesson)),
     [lessons, isHidden]
   );
-
-  const copyUrl = React.useCallback(async (config: SyncConfig) => {
-    const url = calendarUrl(config);
-    await Clipboard.setStringAsync(url);
-    setCopiedUrl(url);
-    setTimeout(() => setCopiedUrl((current) => (current === url ? null : current)), 2000);
-  }, []);
 
   const confirmRemove = React.useCallback(
     (config: SyncConfig) => {
@@ -79,6 +61,14 @@ export default function SettingsScreen() {
     }
   }, [visibleLessons]);
 
+  const exportIcs = React.useCallback(async () => {
+    try {
+      await downloadLessonsIcs(visibleLessons, 'My timetable');
+    } catch (error) {
+      Alert.alert('Export failed', error instanceof Error ? error.message : 'Could not export.');
+    }
+  }, [visibleLessons]);
+
   const confirmReset = React.useCallback(() => {
     const message = 'This removes your class schedules and all hidden classes from this device.';
     const run = () => {
@@ -96,10 +86,14 @@ export default function SettingsScreen() {
 
   // Hide the "remove" affordance while a sync is in flight to keep the list stable.
   const removable = !syncing;
+  // Only clear the status bar on native; web gets no extra top gap.
+  const insets = useSafeAreaInsets();
 
   return (
     <View className="flex-1 bg-background">
-      <View className="flex-row items-center gap-3 px-4 pb-2 pt-14">
+      <View
+        className="flex-row items-center gap-3 px-4 pb-2 pt-3"
+        style={{ paddingTop: Math.max(insets.top, 12) }}>
         <Pressable
           onPress={() => router.back()}
           accessibilityLabel="Back"
@@ -158,7 +152,6 @@ export default function SettingsScreen() {
               )}
 
               {data.timetables.map((entry) => {
-                const activeCopy = copiedUrl === calendarUrl(entry.config);
                 return (
                   <View
                     key={`${entry.config.baseUrl}-${entry.config.classId}`}
@@ -166,19 +159,11 @@ export default function SettingsScreen() {
                     <View className="flex-1">
                       <Text className="text-sm font-semibold">{entry.config.className}</Text>
                       <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
-                        {entry.lessons.length} lessons · {entry.config.baseUrl}
+                        {entry.lessons.length} lessons
+                        {entry.config.schoolYear ? ` · ${entry.config.schoolYear}` : ''} ·{' '}
+                        {displayBaseUrl(entry.config.baseUrl)}
                       </Text>
                     </View>
-                    <Pressable
-                      onPress={() => void copyUrl(entry.config)}
-                      accessibilityLabel={`Copy sync URL for ${entry.config.className}`}
-                      className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
-                      {activeCopy ? (
-                        <Check size={14} color="hsl(var(--primary))" />
-                      ) : (
-                        <Link2 size={14} color="hsl(var(--muted-foreground))" />
-                      )}
-                    </Pressable>
                     {removable && (
                       <Pressable
                         onPress={() => confirmRemove(entry.config)}
@@ -210,14 +195,22 @@ export default function SettingsScreen() {
                   <Text>Add class</Text>
                 </Button>
               </View>
-              <View className="mt-2">
+              <View className="mt-2 gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
                   disabled={visibleLessons.length === 0}
+                  onPress={() => void exportIcs()}>
+                  <FileDown size={14} color="hsl(var(--muted-foreground))" />
+                  <Text>Export timetable (ICS · for calendar apps)</Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={visibleLessons.length === 0}
                   onPress={() => void exportCsv()}>
                   <FileDown size={14} color="hsl(var(--muted-foreground))" />
-                  <Text>Export timetable (CSV)</Text>
+                  <Text>Export timetable (CSV · for spreadsheets)</Text>
                 </Button>
               </View>
             </View>
@@ -277,7 +270,7 @@ export default function SettingsScreen() {
               <Text>Clear all data</Text>
             </Button>
             <Text className="mt-4 text-center text-xs text-muted-foreground">
-              Actually Usable Calendar · powered by AP-WebUntisToICS
+              Actually Usable Calendar · powered by WebUntis
             </Text>
           </View>
         }

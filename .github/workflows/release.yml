@@ -126,21 +126,37 @@ jobs:
 
       # Wait for FINISHED (status: NEW → IN_QUEUE → IN_PROGRESS → FINISHED),
       # then download the APK artifact and hand it to the release step.
+      # The status call itself is retried: a transient eas CLI/API hiccup
+      # must not fail a release that's otherwise 20 minutes in.
       - name: Wait for build to finish
         run: |
           BUILD_ID="${{ steps.trigger.outputs.build_id }}"
           for i in $(seq 1 50); do
-            STATUS=$(eas build:view "$BUILD_ID" --json | jq -r '.status')
+            STATUS=""
+            for attempt in 1 2 3 4 5; do
+              if JSON=$(eas build:view "$BUILD_ID" --json 2>/dev/null); then
+                STATUS=$(echo "$JSON" | jq -r '.status // empty')
+                [ -n "$STATUS" ] && break
+              fi
+              echo "[poll $i.$attempt] status call failed — retrying in 15s"
+              sleep 15
+            done
+            if [ -z "$STATUS" ]; then
+              echo "Could not read the build status after 5 attempts."
+              echo "Check the build manually on https://expo.dev/accounts/ (build id: $BUILD_ID)."
+              exit 1
+            fi
             echo "[$i] status: $STATUS"
             case "$STATUS" in
               FINISHED)
                 URL=$(eas build:view "$BUILD_ID" --json | jq -r '.artifacts.buildUrl')
                 echo "Downloading $URL"
-                curl -fL "$URL" -o app-release.apk
+                curl -fL --retry 5 "$URL" -o app-release.apk
                 exit 0
                 ;;
               ERRORED|CANCELED)
-                echo "EAS build $STATUS — see the EAS dashboard for logs."
+                echo "EAS build $STATUS — open the build on https://expo.dev/accounts/ (id: $BUILD_ID) for logs."
+                eas build:view "$BUILD_ID" --json | jq '{id, status, error, errorCode, message}' || true
                 exit 1
                 ;;
             esac

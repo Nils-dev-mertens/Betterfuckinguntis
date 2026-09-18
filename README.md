@@ -84,6 +84,14 @@ bun run site:serve                            # local preview without Docker
 | `update.yml` | push to `main` | EAS OTA update (JS-only, typechecked first) |
 | `release.yml` | tag `v*.*.*` | APK built on EAS cloud, attached to a GitHub Release (= download button target) |
 
+`release.yml` also carries a version failsafe: it rewrites `app.json`,
+`package.json` and `android.versionCode` from the pushed tag (e.g. tag
+`v1.0.2` → version `1.0.2`, versionCode `10002`), commits that back to
+`main`, and only then builds — so a release can never ship with a stale
+version number or a versionCode too low to install over the previous APK.
+`fingerprint.config.js` keeps version fields out of the update fingerprint,
+so those bumps don't break in-app OTA updates for older installs.
+
 Both need an `EXPO_TOKEN` repo secret (create at expo.dev/settings/access-tokens).
 
 Manual equivalents:

@@ -6,6 +6,15 @@ name: release
 # a GitHub Release, so the website (or any user) can link to a stable,
 # permanent download per version.
 
+# ── Version failsafe ──────────────────────────────────────────────────────
+# A tag alone doesn't change the app version — the APK reports whatever is in
+# app.json, and Android needs a strictly increasing versionCode to allow
+# installing over an old build. To never ship a release that looks/behave like
+# the previous one, the workflow syncs app.json, package.json and
+# android.versionCode to the pushed tag and commits that back to main before
+# building. The EAS build then always produces, e.g., version 1.0.2
+# (versionCode 3) for tag v1.0.2 — regardless of what the repo said.
+
 on:
   push:
     tags:
@@ -29,6 +38,9 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Needed to push the version-sync commit back to main.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -43,6 +55,60 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # ── Version sync (the failsafe) ────────────────────────────────────
+      # Rewrite the version fields from the pushed tag (vX.Y.Z → X.Y.Z),
+      # versionCode = major*10000 + minor*100 + patch (monotonic per
+      # semver comparison; v1.0.2 → 10002, v1.1.0 → 10100, v2.0.0 → 20000),
+      # and commit+push back to main so the released state is in the repo.
+      - name: Sync version to tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '${GITHUB_REF_NAME}' is not vX.Y.Z — cannot derive a version."
+            exit 1
+          fi
+          MAJOR=$(echo "$TAG" | cut -d. -f1)
+          MINOR=$(echo "$TAG" | cut -d. -f2)
+          PATCH=$(echo "$TAG" | cut -d. -f3)
+          VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
+
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.version = '$TAG';
+            app.expo.android = { ...(app.expo.android ?? {}), versionCode: $VERSION_CODE };
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$TAG';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          echo "Tag v$TAG → version $TAG, versionCode $VERSION_CODE"
+          git diff --stat
+
+      - name: Commit synced version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "app.json/package.json already match the tag — nothing to commit."
+          else
+            git add app.json package.json
+            git commit -m "chore: sync version to ${GITHUB_REF_NAME} [skip ci]"
+            # Retry loop: rebase in case a push to main raced with us.
+            for i in 1 2 3; do
+              if git push origin HEAD:main; then
+                echo "Pushed version-sync commit to main."
+                exit 0
+              fi
+              echo "Push failed (attempt $i) — rebasing onto origin/main and retrying…"
+              git fetch origin main
+              git rebase origin/main
+            done
+            echo "Could not push the version-sync commit after 3 attempts."
+            exit 1
+          fi
 
       - name: Typecheck
         run: bun run typecheck

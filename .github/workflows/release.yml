@@ -1,8 +1,10 @@
 name: release
 
 # Build a sideloadable APK whenever a version tag is pushed (v1.0.1, ...).
-# The APK is attached to a GitHub Release, so the website (or any user) can
-# link to a stable, permanent download per version.
+# The build runs on EAS's cloud (reliable, ~15-20 min — no cold Gradle/SDK
+# downloads on the runner), the workflow waits for it and attaches the APK to
+# a GitHub Release, so the website (or any user) can link to a stable,
+# permanent download per version.
 
 on:
   push:
@@ -13,6 +15,8 @@ jobs:
   apk:
     name: Build APK
     runs-on: ubuntu-latest
+    # Fail fast instead of hanging for hours (GitHub's default is 360 min).
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -43,8 +47,41 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Build APK (local, no EAS queue)
-        run: eas build --platform android --profile apk --local --non-interactive --output app-release.apk
+      # Queue the build on EAS and grab its id (--no-wait returns immediately;
+      # the next step polls). Your first cloud build already created the EAS
+      # project + keystore, so this is fully non-interactive.
+      - name: Trigger EAS build
+        id: trigger
+        run: |
+          eas build --platform android --profile apk --non-interactive --no-wait --json > build.json
+          BUILD_ID=$(jq -r '.[0].id // .id' build.json)
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "EAS build queued: https://expo.dev/accounts/$(jq -r '.[0].project.name // empty' build.json 2>/dev/null || true) (id: $BUILD_ID)"
+
+      # Wait for FINISHED (status: NEW → IN_QUEUE → IN_PROGRESS → FINISHED),
+      # then download the APK artifact and hand it to the release step.
+      - name: Wait for build to finish
+        run: |
+          BUILD_ID="${{ steps.trigger.outputs.build_id }}"
+          for i in $(seq 1 50); do
+            STATUS=$(eas build:view "$BUILD_ID" --json | jq -r '.status')
+            echo "[$i] status: $STATUS"
+            case "$STATUS" in
+              FINISHED)
+                URL=$(eas build:view "$BUILD_ID" --json | jq -r '.artifacts.buildUrl')
+                echo "Downloading $URL"
+                curl -fL "$URL" -o app-release.apk
+                exit 0
+                ;;
+              ERRORED|CANCELED)
+                echo "EAS build $STATUS — see the EAS dashboard for logs."
+                exit 1
+                ;;
+            esac
+            sleep 60
+          done
+          echo "Timed out waiting for the EAS build after 50 minutes."
+          exit 1
 
       - name: Release
         uses: softprops/action-gh-release@v2

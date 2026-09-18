@@ -5,17 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Actually Usable Calendar — a fast, offline-first timetable app for AP Hogeschool. Free APK download."
+      content="Actually Usable Calendar — a fast, offline-first WebUntis timetable app that actually works. Free APK download."
     />
     <meta name="theme-color" content="#0b0b10" />
-    <title>Actually Usable Calendar — Timetable for AP Hogeschool</title>
+    <title>Actually Usable Calendar — a WebUntis app that actually works</title>
     <style>
       /*
        * Standalone landing page — no build step, no framework. Deployed as
-       * plain static files (e.g. the bundled Dockerfile). The button always
-       * resolves the newest release at runtime from the GitHub API; the
-       * data-apk-href attribute is an optional pre-resolved fallback that
-       * a deploy script may bake in.
+       * plain static files (e.g. the bundled Dockerfile). All .js-download
+       * links resolve the newest release at runtime from the GitHub API and
+       * point at the actual APK asset.
        */
       :root {
         --bg: #0b0b10;
@@ -31,6 +30,9 @@
         margin: 0;
         padding: 0;
       }
+      html {
+        scroll-behavior: smooth;
+      }
       body {
         background: var(--bg);
         color: var(--text);
@@ -43,72 +45,74 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
+        overflow-x: hidden;
+      }
+      .glow {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            700px 340px at 50% -80px,
+            rgba(124, 92, 255, 0.22),
+            transparent 70%
+          ),
+          radial-gradient(
+            900px 460px at 85% 12%,
+            rgba(70, 48, 168, 0.14),
+            transparent 70%
+          );
       }
       .wrap {
+        position: relative;
+        z-index: 1;
         width: 100%;
-        max-width: 720px;
+        max-width: 920px;
         margin: 0 auto;
-        padding: 24px 20px 48px;
+        padding: clamp(40px, 7vw, 96px) clamp(20px, 4vw, 32px) clamp(56px, 8vw, 96px);
       }
-      header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 8px 0 32px;
-      }
-      .logo {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, var(--primary), #4630a8);
-        display: grid;
-        place-items: center;
-        font-size: 20px;
-      }
-      header h1 {
-        font-size: 17px;
-        font-weight: 700;
-      }
-      header span {
-        display: block;
-        font-size: 12px;
-        color: var(--muted);
-        font-weight: 400;
-      }
+
+      /* ── hero ───────────────────────────────────────────────── */
       .hero {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        padding: 40px 28px;
         text-align: center;
+        padding: clamp(24px, 5vw, 72px) 0 clamp(48px, 7vw, 96px);
       }
-      .hero h2 {
-        font-size: clamp(26px, 6vw, 34px);
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        line-height: 1.15;
+      .hero-title {
+        font-size: clamp(46px, 10vw, 92px);
+        font-weight: 900;
+        line-height: 1.02;
+        letter-spacing: -0.035em;
       }
-      .hero p {
-        margin: 14px auto 0;
-        max-width: 460px;
+      .grad {
+        background: linear-gradient(100deg, #a78bfa 0%, var(--primary) 55%, #6d4aff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero-sub {
+        margin: 24px auto 0;
+        max-width: 620px;
         color: var(--muted);
-        font-size: 15px;
-        line-height: 1.6;
+        font-size: clamp(16px, 2.4vw, 19px);
+        line-height: 1.65;
       }
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
-        margin-top: 28px;
-        height: 52px;
-        padding: 0 28px;
-        border-radius: 12px;
+        margin-top: 36px;
+        height: 60px;
+        padding: 0 34px;
+        border-radius: 15px;
         background: var(--primary);
         color: #fff;
-        font-size: 16px;
-        font-weight: 700;
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
         text-decoration: none;
+        box-shadow: 0 12px 40px -8px rgba(124, 92, 255, 0.55);
         transition:
           background 0.15s ease,
           transform 0.1s ease;
@@ -119,98 +123,126 @@
       .btn:active {
         transform: scale(0.98);
       }
+      .btn:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 3px;
+      }
       .btn svg {
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
       }
       .meta {
-        margin-top: 14px;
-        font-size: 12px;
+        margin-top: 16px;
+        font-size: 13px;
         color: var(--muted);
       }
       .meta b {
         color: var(--text);
       }
-      .features {
-        margin-top: 20px;
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      }
-      .feature {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 18px;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .feature b {
-        display: block;
-        margin-bottom: 4px;
-      }
-      .feature span {
-        color: var(--muted);
-      }
+
+      /* ── install steps ──────────────────────────────────────── */
       .steps {
-        margin-top: 20px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 22px;
+        margin-top: clamp(8px, 2vw, 24px);
       }
-      .steps h3 {
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--muted);
-        margin-bottom: 14px;
+      .steps > h2 {
+        font-size: clamp(28px, 5.5vw, 44px);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        margin-bottom: clamp(26px, 4vw, 40px);
       }
       .steps ol {
-        margin-left: 18px;
+        list-style: none;
         display: grid;
-        gap: 10px;
-        font-size: 14px;
-        line-height: 1.55;
+        gap: clamp(22px, 3.5vw, 36px);
       }
-      footer {
-        margin-top: 32px;
-        text-align: center;
-        font-size: 12px;
+      .step {
+        display: flex;
+        align-items: baseline;
+        gap: clamp(16px, 2.5vw, 24px);
+      }
+      .step em {
+        font-style: normal;
+        font-size: clamp(38px, 4.5vw, 48px);
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        min-width: 52px;
+        background: linear-gradient(135deg, var(--primary), #a78bfa);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .step b {
+        display: block;
+        font-size: clamp(19px, 2.2vw, 22px);
+        font-weight: 800;
+        margin-bottom: 4px;
+      }
+      .step span {
         color: var(--muted);
-        line-height: 1.7;
+        font-size: clamp(16px, 1.9vw, 18px);
+        line-height: 1.65;
+      }
+
+      /* ── bottom CTA ─────────────────────────────────────────── */
+      .cta {
+        margin-top: clamp(80px, 12vw, 160px);
+        text-align: center;
+      }
+      .cta h2 {
+        font-size: clamp(30px, 6vw, 48px);
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.08;
+      }
+      .cta p {
+        margin: 14px auto 0;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .cta .btn {
+        margin-top: 30px;
+      }
+
+      footer {
+        margin-top: clamp(80px, 12vw, 140px);
+        text-align: center;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.8;
       }
       footer a {
         color: var(--muted);
       }
+      footer a:hover {
+        color: var(--text);
+      }
     </style>
   </head>
   <body>
+    <div class="glow"></div>
     <div class="wrap">
-      <header>
-        <div class="logo">📅</div>
-        <h1>Actually Usable Calendar <span>by Nils</span></h1>
-      </header>
-
       <section class="hero">
-        <h2>Your timetable,<br />minus the annoying parts.</h2>
-        <p>
-          A fast, offline-first timetable app for AP Hogeschool. Live sync from
-          WebUntis, a clear week grid, and automatic updates — no app store
-          needed.
+        <h1 class="hero-title">
+          A WebUntis app<br />
+          that <span class="grad">actually works.</span>
+        </h1>
+        <p class="hero-sub">
+          Your real timetable in a week grid you can actually read. Live sync,
+          offline-first, a Now &amp; Next banner — and updates that install
+          themselves. No app store, no account.
         </p>
-        <!-- optional pre-resolved APK URL; the script falls back to the GitHub API -->
         <a
-          id="download-btn"
-          class="btn"
+          class="btn js-download"
           href="https://github.com/Nils-dev-mertens/Betterfuckinguntis/releases/latest"
         >
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="2.4"
             stroke-linecap="round"
             stroke-linejoin="round"
           >
@@ -218,43 +250,73 @@
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          <span id="download-label">Download for Android</span>
+          <span class="js-download-label">Download for Android — free</span>
         </a>
         <div class="meta" id="release-meta">Fetching latest version…</div>
       </section>
 
-      <section class="features">
-        <div class="feature">
-          <b>Always current</b>
-          <span>Now &amp; next banner, live now-line, minute-accurate times.</span>
-        </div>
-        <div class="feature">
-          <b>Offline first</b>
-          <span>Syncs once, works everywhere — no signal, no problem.</span>
-        </div>
-        <div class="feature">
-          <b>Your rules</b>
-          <span>Hide classes you don't need, add your own lessons.</span>
-        </div>
-      </section>
-
       <section class="steps">
-        <h3>Install in 3 steps</h3>
+        <h2>On your phone in two minutes.</h2>
         <ol>
-          <li>Tap the download button and open the APK file.</li>
-          <li>
-            Allow <i>install unknown apps</i> for your browser if Android asks
-            (one time only).
+          <li class="step">
+            <em>1</em>
+            <div>
+              <b>Tap download</b>
+              <span>Open the APK file from your notifications or downloads.</span>
+            </div>
           </li>
-          <li>
-            Open the app, pick your class — done. Updates arrive inside the
-            app automatically.
+          <li class="step">
+            <em>2</em>
+            <div>
+              <b>Allow the install</b>
+              <span>
+                Android asks once for <i>install unknown apps</i> — allow it for
+                your browser. That's the only hoop.
+              </span>
+            </div>
+          </li>
+          <li class="step">
+            <em>3</em>
+            <div>
+              <b>Pick your class</b>
+              <span>
+                Done. Your timetable loads, and every future update arrives
+                inside the app.
+              </span>
+            </div>
           </li>
         </ol>
       </section>
 
+      <section class="cta">
+        <h2>Stop squinting at <span class="grad">the WebUntis list.</span></h2>
+        <p>
+          One APK, your whole timetable, readable at a glance. Installing over
+          an old version keeps all your data.
+        </p>
+        <a
+          class="btn js-download"
+          href="https://github.com/Nils-dev-mertens/Betterfuckinguntis/releases/latest"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span class="js-download-label">Get the APK</span>
+        </a>
+      </section>
+
       <footer>
-        Data comes straight from WebUntis and stays on your device.<br />
+        Actually Usable Calendar — data comes straight from WebUntis and stays
+        on your device.<br />
         <a
           href="https://github.com/Nils-dev-mertens/Betterfuckinguntis"
           target="_blank"
@@ -265,12 +327,13 @@
     </div>
 
     <script>
-      // Resolve the newest release from the GitHub API and point the button
-      // at the actual APK asset. Falls back to the releases page silently.
+      // Resolve the newest release from the GitHub API and point every
+      // .js-download link at the actual APK asset. Falls back to the
+      // releases page silently if the API is unreachable (rate limit etc.).
       (function () {
         var repo = 'Nils-dev-mertens/Betterfuckinguntis';
-        var btn = document.getElementById('download-btn');
-        var label = document.getElementById('download-label');
+        var buttons = document.querySelectorAll('.js-download');
+        var labels = document.querySelectorAll('.js-download-label');
         var meta = document.getElementById('release-meta');
         fetch('https://api.github.com/repos/' + repo + '/releases/latest', {
           headers: { accept: 'application/vnd.github+json' },
@@ -285,10 +348,12 @@
             });
             var version = (rel.tag_name || '').replace(/^v/, '');
             if (apk && apk.browser_download_url) {
-              btn.href = apk.browser_download_url;
+              buttons.forEach(function (b) {
+                b.href = apk.browser_download_url;
+              });
             }
             if (version) {
-              label.textContent = 'Download for Android — v' + version;
+              labels[0].textContent = 'Download for Android — v' + version;
             }
             var date = rel.published_at
               ? new Date(rel.published_at).toLocaleDateString(undefined, {
@@ -297,19 +362,21 @@
                   year: 'numeric',
                 })
               : null;
-            meta.innerHTML = date
-              ? 'Latest release <b>v' +
-                version +
-                '</b> · ' +
-                date +
-                ' · installing over an old version keeps your data'
-              : meta.textContent;
+            if (meta) {
+              meta.innerHTML = date
+                ? 'Latest release <b>v' +
+                  version +
+                  '</b> · ' +
+                  date +
+                  ' · installing over an old version keeps your data'
+                : meta.textContent;
+            }
           })
           .catch(function () {
-            // API unreachable (rate limit etc.): the button keeps its
-            // releases-page href; don't nag the visitor.
-            meta.textContent =
-              'Install over an older version to update — your data stays.';
+            // API unreachable: keep the releases-page hrefs, don't nag.
+            if (meta)
+              meta.textContent =
+                'Install over an older version to update — your data stays.';
           });
       })();
     </script>

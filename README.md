@@ -82,7 +82,7 @@ bun run site:serve                            # local preview without Docker
 | Pipeline | Trigger | Output |
 | --- | --- | --- |
 | `update.yml` | push to `main` | EAS OTA update (JS-only, typechecked first) |
-| `release.yml` | tag `v*.*.*` | APK attached to a GitHub Release (= download button target) |
+| `release.yml` | tag `v*.*.*` | APK built on EAS cloud, attached to a GitHub Release (= download button target) |
 
 Both need an `EXPO_TOKEN` repo secret (create at expo.dev/settings/access-tokens).
 
@@ -90,8 +90,7 @@ Manual equivalents:
 
 ```sh
 eas update --auto --branch production                     # push an OTA update
-eas build -p android --profile apk --local               # build APK locally
-eas build -p android --profile apk                       # build on EAS cloud
+eas build -p android --profile apk                       # build APK on EAS cloud (same as the release pipeline)
 ```
 
 In-app, Settings → "Check for updates" fetches and applies OTA updates

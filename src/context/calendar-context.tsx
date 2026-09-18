@@ -117,7 +117,13 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         const hiddenSubjects = [...new Set(data.hidden.map((rule) => rule.subject))];
         const results = await Promise.all(
           targets.map((target) =>
-            fetchLessons(target.baseUrl, target.classId, target.dateRange, hiddenSubjects)
+            fetchLessons(
+              target.baseUrl,
+              target.classId,
+              target.dateRange,
+              hiddenSubjects,
+              target.className
+            )
           )
         );
         const fetched: ClassTimetable[] = targets.map((config, i) => ({ config, lessons: results[i] }));

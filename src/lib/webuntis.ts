@@ -292,7 +292,12 @@ function getEntryPositions(entry: ApiGridEntry): CleanPositions {
 }
 
 /** Map a raw timetable to lessons, dropping subjects named in `filter`. */
-export function mapTimetableToLessons(timetable: ApiTimetable, filter?: string[]): Lesson[] {
+export function mapTimetableToLessons(
+  timetable: ApiTimetable,
+  filter?: string[],
+  sourceClass?: string,
+  sourceClassId?: number
+): Lesson[] {
   const filterSubjects = (filter ?? [])
     .map((subject) => subject.trim().toLowerCase())
     .filter(Boolean);
@@ -321,6 +326,8 @@ export function mapTimetableToLessons(timetable: ApiTimetable, filter?: string[]
         ]
           .filter(Boolean)
           .sort(),
+        sourceClass,
+        sourceClassId,
         manual: false,
       };
 

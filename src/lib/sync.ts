@@ -48,10 +48,11 @@ export async function fetchLessons(
   baseUrl: string,
   classId: number,
   range?: DateRange,
-  filter?: string[]
+  filter?: string[],
+  sourceClass?: string
 ): Promise<Lesson[]> {
   const timetable = await apiGetTimetable(baseUrl, classId, await resolveRange(baseUrl, range));
-  return mapTimetableToLessons(timetable, filter);
+  return mapTimetableToLessons(timetable, filter, sourceClass, classId);
 }
 
 export { normalizeBaseUrl };

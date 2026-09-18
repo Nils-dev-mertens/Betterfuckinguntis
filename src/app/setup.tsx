@@ -119,6 +119,22 @@ export default function SetupScreen() {
   }, [classes, classQuery]);
 
   /**
+   * Classes already on this device, keyed by "server|classId" so the same
+   * WebUntis id from a different year still counts as installed.
+   */
+  const installedKeys = React.useMemo(
+    () =>
+      new Set(data.timetables.map((entry) => `${entry.config.baseUrl}|${entry.config.classId}`)),
+    [data.timetables]
+  );
+
+  const isInstalled = React.useCallback(
+    (schoolClass: SchoolClass) =>
+      installedKeys.has(`${normalizeBaseUrl(baseUrl)}|${schoolClass.id}`),
+    [installedKeys, baseUrl]
+  );
+
+  /**
    * The school year that is most relevant right now: the one with the latest
    * start that has not ended yet. At a year boundary this is the upcoming
    * year; mid-year it is the current one.
@@ -286,24 +302,44 @@ export default function SetupScreen() {
                   </Text>
                 </View>
               }
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => void pickClass(item)}
-                  disabled={Boolean(savingClass)}
-                  className="flex-row items-center justify-between rounded-lg border border-border bg-card px-4 py-3 active:bg-accent">
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-9 w-9 items-center justify-center rounded-md bg-secondary">
-                      <School size={16} color="hsl(var(--muted-foreground))" />
+              renderItem={({ item }) => {
+                const installed = isInstalled(item);
+                return (
+                  <Pressable
+                    onPress={() => void pickClass(item)}
+                    disabled={Boolean(savingClass) || installed}
+                    className={cn(
+                      'flex-row items-center justify-between rounded-lg border px-4 py-3',
+                      installed
+                        ? 'border-border bg-secondary/50 opacity-80'
+                        : 'border-border bg-card active:bg-accent'
+                    )}>
+                    <View className="flex-row items-center gap-3">
+                      <View className="h-9 w-9 items-center justify-center rounded-md bg-secondary">
+                        <School
+                          size={16}
+                          color={installed ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                        />
+                      </View>
+                      <View className="flex-1 pr-2">
+                        <Text className="text-sm font-semibold">{item.name}</Text>
+                        {installed ? (
+                          <Text className="text-[11px] font-medium text-primary">
+                            Already added to your calendar
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
-                    <Text className="text-sm font-semibold">{item.name}</Text>
-                  </View>
-                  {savingClass === item.id ? (
-                    <ActivityIndicator size="small" color="hsl(var(--primary))" />
-                  ) : (
-                    <Check size={16} color="hsl(var(--muted-foreground))" />
-                  )}
-                </Pressable>
-              )}
+                    {savingClass === item.id ? (
+                      <ActivityIndicator size="small" color="hsl(var(--primary))" />
+                    ) : installed ? (
+                      <Check size={16} color="hsl(var(--primary))" />
+                    ) : (
+                      <Check size={16} color="hsl(var(--muted-foreground))" />
+                    )}
+                  </Pressable>
+                );
+              }}
             />
           )}
           {error ? (

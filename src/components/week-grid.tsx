@@ -8,6 +8,10 @@ import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
 const HOUR_HEIGHT = 52;
+const TIME_AXIS_WIDTH = 40;
+/** Fixed day-header heights; the hour axis spacer must match exactly. */
+const DAY_HEADER_HEIGHT_COMPACT = 36;
+const DAY_HEADER_HEIGHT = 48;
 const DEFAULT_DAY_START = 7; // 07:00
 const DEFAULT_DAY_END = 20; // 20:00
 
@@ -79,6 +83,68 @@ function layoutDay(lessons: Lesson[], dayStartMinutes: number): PositionedLesson
   return positions;
 }
 
+/**
+ * Hour labels to the left of the grid. The current hour is highlighted and
+ * a red bubble marks "now" so the vertical position is readable at a
+ * glance. Labels are vertically centered on the hour lines.
+ */
+function TimeAxis({
+  startHour,
+  hoursCount,
+  nowMinutes,
+  mini,
+}: {
+  startHour: number;
+  hoursCount: number;
+  nowMinutes: number;
+  mini: boolean;
+}) {
+  const nowVisible = nowMinutes >= startHour * 60 && nowMinutes <= (startHour + hoursCount) * 60;
+  const nowOffset = (nowMinutes - startHour * 60) * (HOUR_HEIGHT / 60);
+  const headerHeight = mini ? DAY_HEADER_HEIGHT_COMPACT : DAY_HEADER_HEIGHT;
+
+  return (
+    <View
+      className="flex-shrink-0"
+      style={{ width: TIME_AXIS_WIDTH }}
+      pointerEvents="none">
+      {/* Spacer aligning with the day headers */}
+      <View style={{ height: headerHeight }} />
+      {Array.from({ length: hoursCount }, (_, i) => {
+        const hour = startHour + i;
+        const isNow = nowVisible && nowMinutes >= hour * 60 && nowMinutes < (hour + 1) * 60;
+        return (
+          <View
+            key={hour}
+            style={{ height: HOUR_HEIGHT, justifyContent: 'center' }}>
+            <Text
+              className={cn(
+                'text-right tabular-nums',
+                mini ? 'text-[12px]' : 'text-[13px]',
+                isNow
+                  ? 'font-bold text-destructive'
+                  : 'font-semibold text-foreground/90'
+              )}>
+              {String(hour).padStart(2, '0')}
+            </Text>
+          </View>
+        );
+      })}
+      {nowVisible ? (
+        <View
+          className="absolute left-0 right-1 items-end"
+          style={{ top: headerHeight + nowOffset - 9 }}>
+          <View className="rounded bg-destructive px-1.5 py-0.5">
+            <Text className="text-[10px] font-bold tabular-nums text-destructive-foreground">
+              {format(new Date(), 'HH:mm')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function LessonCard({
   position,
   mini,
@@ -121,6 +187,7 @@ function LessonCard({
             mini ? 'text-[8px]' : 'text-[9px]'
           )}>
           {format(lesson.start, 'HH:mm')}
+          {mini ? '' : `–${format(lesson.end, 'HH:mm')}`}
         </Text>
       </View>
     </Pressable>
@@ -185,9 +252,11 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
           dayIndex === 0 && 'border-l-0',
           isToday && 'bg-primary/[0.04]'
         )}>
-        {/* Day header */}
+        {/* Day header — fixed height so the hour axis stays aligned */}
         {mini ? (
-          <View className="items-center border-b border-border px-0.5 py-1">
+          <View
+            className="items-center justify-center border-b border-border px-0.5"
+            style={{ height: DAY_HEADER_HEIGHT_COMPACT }}>
             <Text
               className={cn(
                 'text-[9px] font-bold uppercase',
@@ -204,7 +273,9 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
             </Text>
           </View>
         ) : (
-          <View className="items-center border-b border-border px-1 py-1.5">
+          <View
+            className="items-center justify-center border-b border-border px-1"
+            style={{ height: DAY_HEADER_HEIGHT }}>
             <Text
               className={cn(
                 'text-[10px] font-bold uppercase tracking-wide',
@@ -226,7 +297,7 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
         <View style={{ height: hoursCount * HOUR_HEIGHT }}>
           {Array.from({ length: hoursCount }, (_, i) => {
             const top = (i + 1) * HOUR_HEIGHT - 1;
-            const isHour = (dayStart + i + 1) % 12 !== 0;
+            const isNoonLine = (dayStart + i + 1) % 12 === 0;
             return (
               <View
                 key={`${dayKey(day)}-${i}`}
@@ -237,7 +308,9 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
                   left: 0,
                   right: 0,
                   height: 1,
-                  backgroundColor: isHour ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)',
+                  backgroundColor: isNoonLine
+                    ? 'rgba(255,255,255,0.18)'
+                    : 'rgba(255,255,255,0.10)',
                 }}
               />
             );
@@ -282,13 +355,22 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
     );
   };
 
-  // Columns share the width via flex; no fixed widths, no horizontal scroll.
+  // Columns share the width via flex; a slim hour axis sits on the left of
+  // every mode so card positions can be read without counting day headers.
   return (
-    <ScrollView
-      ref={scrollRef}
-      showsVerticalScrollIndicator={false}
-      className="flex-1 w-full">
-      <View className="w-full flex-row">{days.map(renderDay)}</View>
-    </ScrollView>
+    <View className="flex-1 w-full flex-row">
+      <TimeAxis
+        startHour={dayStart}
+        hoursCount={hoursCount}
+        nowMinutes={minutesOfDay(new Date())}
+        mini={mini}
+      />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        className="flex-1 w-full">
+        <View className="w-full flex-row">{days.map(renderDay)}</View>
+      </ScrollView>
+    </View>
   );
 }

@@ -16,6 +16,11 @@ import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
 type ViewMode = '3d' | '5d' | 'grid' | 'list';
+/**
+ * `null` = all watched classes combined; otherwise the WebUntis class id of
+ * a watched class. Ids (not names) because names can repeat across years.
+ */
+type ClassFilter = number | null;
 
 const SPANS: { key: ViewMode; label: string }[] = [
   { key: '3d', label: '3d' },
@@ -39,16 +44,29 @@ export function CalendarScreen() {
   const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
   const [showAddLesson, setShowAddLesson] = React.useState(false);
   const [now, setNow] = React.useState(() => new Date());
+  /** Which watched class to show; `null` (default) combines them all. */
+  const [classFilter, setClassFilter] = React.useState<ClassFilter>(null);
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
-  const visibleLessons = React.useMemo(
-    () => lessons.filter((lesson) => !isHidden(lesson)),
-    [lessons, isHidden]
-  );
+  const watchedClassCount = data.timetables.length;
+
+  const visibleLessons = React.useMemo(() => {
+    const unhidden = lessons.filter((lesson) => !isHidden(lesson));
+    if (classFilter === null) return unhidden;
+    // Strict match on the watched class id; never on lesson.classes (merged
+    // lessons legitimately list other groups' codes).
+    const exact = unhidden.filter((lesson) => lesson.sourceClassId === classFilter);
+    if (exact.length > 0) return exact;
+    // Data synced before sourceClassId existed: fall back to the name of
+    // that watched class, still ignoring lesson.classes.
+    const name = data.timetables.find((entry) => entry.config.classId === classFilter)?.config
+      .className;
+    return name ? unhidden.filter((lesson) => lesson.sourceClass === name) : exact;
+  }, [lessons, isHidden, classFilter, data.timetables]);
 
   const lessonsForDay = React.useCallback(
     (day: Date) => {
@@ -180,6 +198,47 @@ export function CalendarScreen() {
         </View>
       ) : null}
 
+      {watchedClassCount > 1 ? (
+        <View className="mb-2 flex-row flex-wrap gap-1.5 px-4">
+          <Pressable
+            onPress={() => setClassFilter(null)}
+            className={cn(
+              'rounded-full border px-3 py-1',
+              classFilter === null
+                ? 'border-primary bg-primary/15'
+                : 'border-border bg-secondary active:bg-accent'
+            )}>
+            <Text
+              className={cn(
+                'text-xs font-semibold',
+                classFilter === null ? 'text-primary' : 'text-muted-foreground'
+              )}>
+              All combined
+            </Text>
+          </Pressable>
+          {data.timetables.map((entry) => (
+            <Pressable
+              key={`${entry.config.classId}-${entry.config.schoolYear ?? ''}`}
+              onPress={() => setClassFilter(entry.config.classId)}
+              className={cn(
+                'rounded-full border px-3 py-1',
+                classFilter === entry.config.classId
+                  ? 'border-primary bg-primary/15'
+                  : 'border-border bg-secondary active:bg-accent'
+              )}>
+              <Text
+                className={cn(
+                  'text-xs font-semibold',
+                  classFilter === entry.config.classId ? 'text-primary' : 'text-muted-foreground'
+                )}>
+                {entry.config.className}
+                {entry.config.schoolYear ? ` (${entry.config.schoolYear})` : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {lessons.length > 0 && isTodayShown ? (
         <NowBanner lessons={visibleLessons} now={now} onPressLesson={setSelectedLesson} />
       ) : null}
@@ -202,7 +261,12 @@ export function CalendarScreen() {
       ) : !shownDays.some((day) => lessonsForDay(day).length > 0) ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-sm text-muted-foreground">
-            No classes in the {viewMode === 'list' ? 'week' : `${shownDays.length} days`} shown.
+            {classFilter !== null
+              ? `No classes for ${
+                  data.timetables.find((entry) => entry.config.classId === classFilter)?.config
+                    .className ?? 'this class'
+                } in the ${viewMode === 'list' ? 'week' : `${shownDays.length} days`} shown.`
+              : `No classes in the ${viewMode === 'list' ? 'week' : `${shownDays.length} days`} shown.`}
             {'\n'}If you expected lessons here, check that your class is from the school year you
             want (Settings shows which year it belongs to).
           </Text>

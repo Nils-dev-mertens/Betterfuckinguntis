@@ -33,6 +33,10 @@ export interface Lesson {
   locations: string[];
   /** Class names covered by this lesson */
   classes: string[];
+  /** Watched class this lesson was fetched for (used for per-class filtering) */
+  sourceClass?: string;
+  /** WebUntis id of the watched class this lesson was fetched for */
+  sourceClassId?: number;
   /** Whether this lesson was created manually (not from server sync) */
   manual?: boolean;
   /** Manual lessons only: repeat weekly on the same weekday until `repeatUntil` */

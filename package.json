@@ -48,9 +48,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server && tsc --noEmit -p website",
     "web:build": "expo export --platform web",
-    "web:serve": "bun run server/index.ts"
+    "web:serve": "bun run server/index.ts",
+    "site:serve": "bun run website/server.ts"
   },
   "private": true
 }

@@ -65,15 +65,24 @@ are excluded at sync time).
 
 ## Builds & updates
 
-The app is distributed as a self-hosted APK: download it from the website,
-install once, and receive JS-only fixes silently via [EAS Update](https://docs.expo.dev/eas-update/introduction/)
+The app is distributed as a self-hosted APK: the landing page (`website/index.html`, plain HTML, no build step) offers the download; install once, and receive JS-only fixes silently via [EAS Update](https://docs.expo.dev/eas-update/introduction/)
 (no reinstall). Native changes require a new APK; the `fingerprint`
 runtime-version policy guarantees devices only get compatible updates.
+
+The landing page resolves the newest release at runtime via the GitHub API,
+so its download button always points at the latest APK without redeploying.
+Host it anywhere static files work — e.g. with the bundled Dockerfile:
+
+```sh
+docker build -t betteruntis-site .
+docker run -d -p 8080:80 betteruntis-site     # → http://localhost:8080
+bun run site:serve                            # local preview without Docker
+```
 
 | Pipeline | Trigger | Output |
 | --- | --- | --- |
 | `update.yml` | push to `main` | EAS OTA update (JS-only, typechecked first) |
-| `release.yml` | tag `v*.*.*` | APK attached to a GitHub Release |
+| `release.yml` | tag `v*.*.*` | APK attached to a GitHub Release (= download button target) |
 
 Both need an `EXPO_TOKEN` repo secret (create at expo.dev/settings/access-tokens).
 

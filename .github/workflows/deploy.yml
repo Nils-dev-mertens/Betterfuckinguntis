@@ -1,0 +1,40 @@
+name: Deploy
+
+# Rebuild and redeploy the download landing page (website/, served by the
+# root Dockerfile) on the own server whenever main changes. The APK pipelines
+# are separate: update.yml publishes OTA updates, release.yml builds APKs.
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Connect runner to Tailscale
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          version: latest
+
+      # Deploy to server
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy
+        run: |
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.TS_USER }}@${{ secrets.TS_HOST }} "
+          cd /home/${{ secrets.TS_USER }}/cybertestgitbook/Desktop/actually-usable-calendar/
+          git checkout main
+          git pull
+          docker build -t calendar-site .
+          docker stop calendar-site || true
+          docker rm calendar-site || true
+          docker run -d --name calendar-site --restart unless-stopped -p 5200:80 calendar-site:latest
+          "

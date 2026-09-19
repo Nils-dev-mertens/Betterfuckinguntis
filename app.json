@@ -2,7 +2,7 @@
   "expo": {
     "name": "Actually Usable Calendar",
     "slug": "actually-usable-calendar",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "actuallyusablecalendar",
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 10100
+      "versionCode": 10200
     },
     "web": {
       "output": "single",

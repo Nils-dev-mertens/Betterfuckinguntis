@@ -39,6 +39,8 @@ export interface Lesson {
   sourceClassId?: number;
   /** Whether this lesson was created manually (not from server sync) */
   manual?: boolean;
+  /** Optional custom accent (hex) picked at creation; overrides the hashed subject color */
+  color?: string;
   /** Manual lessons only: repeat weekly on the same weekday until `repeatUntil` */
   repeat?: 'none' | 'weekly';
   /** ISO date (YYYY-MM-DD) of the last occurrence, inclusive; absent = repeat forever */
@@ -96,4 +98,6 @@ export interface AppData {
   lastSyncedAt: number | null;
   /** Local reminder settings */
   reminders: Reminders;
+  /** Whether the first-launch intro has been shown (skipped counts too) */
+  introSeen: boolean;
 }

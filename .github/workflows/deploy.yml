@@ -1,8 +1,11 @@
 name: Deploy
 
-# Rebuild and redeploy the download landing page (website/, served by the
-# root Dockerfile) on the own server whenever main changes. The APK pipelines
-# are separate: update.yml publishes OTA updates, release.yml builds APKs.
+# Rebuild and redeploy both web deployments on the own server whenever main
+# changes:
+#  - the download landing page (website/, root Dockerfile) → calendar-site :5200
+#  - the web app preview (dist/ + CORS proxy, Dockerfile.web) → calendar-web :5201
+# The APK pipelines are separate: update.yml publishes OTA updates,
+# release.yml builds APKs.
 
 on:
   push:
@@ -33,8 +36,6 @@ jobs:
           cd /home/${{ secrets.TS_USER }}/Desktop/actually-usable-calendar/
           git checkout main
           git pull
-          docker build -t calendar-site .
-          docker stop calendar-site || true
-          docker rm calendar-site || true
-          docker run -d --name calendar-site --restart unless-stopped -p 5200:80 calendar-site:latest
+          docker compose down
+          docker compose up -d --build
           "

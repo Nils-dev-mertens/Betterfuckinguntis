@@ -17,12 +17,17 @@ interface LessonSheetProps {
 
 export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
   const { isHidden, hideLesson, unhideRule, removeLesson, removeLessonOccurrence } = useCalendar();
+  // Modals render outside the themed root view, so the CSS variables must
+  // be re-declared here for the picked theme/accent to apply inside.
+  const { style: themeStyle } = useTheme();
 
   if (!lesson) return null;
   const hidden = isHidden(lesson);
   const rule = ruleFromLesson(lesson);
   const { isDark } = useTheme();
-  const color = isDark ? subjectColor(lesson.subject) : lightSubjectColor(lesson.subject);
+  const color = isDark
+    ? subjectColor(lesson.subject, lesson.color)
+    : lightSubjectColor(lesson.subject, lesson.color);
   const { start } = lessonMinutes(lesson);
   const hh = String(Math.floor(start / 60)).padStart(2, '0');
   const mm = String(start % 60).padStart(2, '0');
@@ -71,7 +76,10 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
       animationType="fade"
       statusBarTranslucent={Platform.OS === 'android'}
       onRequestClose={onClose}>
-      <View className="flex-1 justify-end web:justify-center web:items-center">
+      <View
+        className="flex-1 justify-end web:justify-center web:items-center"
+        style={themeStyle}>
+        {/** theme vars re-declared so the sheet follows the picked theme */}
         <Pressable
           className="absolute inset-0"
           style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}

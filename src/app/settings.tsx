@@ -2,21 +2,16 @@ import { format } from 'date-fns';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Icon as ArrowLeft,
-  Icon as BellRing,
-  Icon as Clock3,
+  Icon as Bell,
+  Icon as Download,
   Icon as EyeOff,
-  Icon as FileDown,
-  Icon as Info,
-  Icon as Layers,
-  Icon as Palette,
   Icon as Plus,
   Icon as RefreshCw,
-  Icon as Wrench,
-  Icon as X,
+  Icon as Trash2,
 } from '@/components/ui/icon';
 import { useCalendar } from '@/context/calendar-context';
 import { useTheme } from '@/context/theme-context';
@@ -34,15 +29,109 @@ import { downloadLessonsCsv } from '@/lib/csv';
 import { downloadLessonsIcs } from '@/lib/ics-export';
 import { checkForUpdate, updatesSupported } from '@/lib/updates';
 import type { SyncConfig } from '@/lib/types';
-import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
+/* ------------------------------------------------------------------ */
+/* Small building blocks: a section is a title + one plain card; a row  */
+/* is one action. No nested boxes, no icon tiles — just clean rows.     */
+/* ------------------------------------------------------------------ */
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View>
+      <Text className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </Text>
+      <View className="overflow-hidden rounded-xl border border-border bg-card">{children}</View>
+    </View>
+  );
+}
+
+function Row({
+  icon,
+  title,
+  subtitle,
+  danger,
+  disabled,
+  onPress,
+  right,
+  last,
+}: {
+  icon?: string;
+  title: string;
+  subtitle?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onPress?: () => void;
+  right?: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || !onPress}
+      className={cn(
+        'flex-row items-center gap-3 px-4 py-3',
+        !last && 'border-b border-border',
+        onPress && !disabled && 'active:bg-accent/60',
+        disabled && 'opacity-50'
+      )}>
+      {icon ? <IconGlyph name={icon} danger={danger} /> : null}
+      <View className="flex-1">
+        <Text className={cn('text-sm font-medium', danger && 'text-destructive')}>{title}</Text>
+        {subtitle ? (
+          <Text className="mt-0.5 text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {right}
+    </Pressable>
+  );
+}
+
+/** Small plain glyph in front of a row — muted, no colored tile. */
+function IconGlyph({ name, danger }: { name: string; danger?: boolean }) {
+  const color = danger ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))';
+  return (
+    <View className="w-6 items-center">
+      {name === 'refresh' ? (
+        <RefreshCw size={15} color={color} as="refresh-cw" />
+      ) : name === 'plus' ? (
+        <Plus size={15} color={color} as="plus" />
+      ) : name === 'download' ? (
+        <Download size={15} color={color} as="download" />
+      ) : name === 'bell' ? (
+        <Bell size={15} color={color} as="bell" />
+      ) : name === 'eye-off' ? (
+        <EyeOff size={15} color={color} as="eye-off" />
+      ) : null}
+    </View>
+  );
+}
+
+function SectionCaption({ children }: { children: React.ReactNode }) {
+  return <Text className="mt-1.5 px-1 text-xs leading-4 text-muted-foreground">{children}</Text>;
+}
+
+/* ------------------------------------------------------------------ */
+
 export default function SettingsScreen() {
   const router = useRouter();
-  const { data, lessons, syncing, syncNow, unhideRule, resetAll, hiddenRules, removeClass, isHidden, updateReminders } =
-    useCalendar();
+  const {
+    data,
+    lessons,
+    syncing,
+    syncNow,
+    unhideRule,
+    resetAll,
+    hiddenRules,
+    removeClass,
+    isHidden,
+    updateReminders,
+  } = useCalendar();
   const { themeId, accentId, setTheme, setAccent } = useTheme();
 
   const [reminderPermission, setReminderPermission] = React.useState<string | null>(null);
@@ -88,7 +177,6 @@ export default function SettingsScreen() {
     try {
       await downloadLessonsCsv(visibleLessons);
     } catch (error) {
-      // Surface export failures (e.g. sharing unavailable) next to the button.
       Alert.alert('Export failed', error instanceof Error ? error.message : 'Could not export.');
     }
   }, [visibleLessons]);
@@ -116,11 +204,6 @@ export default function SettingsScreen() {
     }
   }, [resetAll, router]);
 
-  // Hide the "remove" affordance while a sync is in flight to keep the list stable.
-  const removable = !syncing;
-  // Only clear the status bar on native; web gets no extra top gap.
-  const insets = useSafeAreaInsets();
-
   const [checkingUpdate, setCheckingUpdate] = React.useState(false);
   const [updateMessage, setUpdateMessage] = React.useState<string | null>(null);
 
@@ -132,8 +215,13 @@ export default function SettingsScreen() {
     setCheckingUpdate(false);
   }, []);
 
+  // Only clear the status bar on native; web gets no extra top gap.
+  const insets = useSafeAreaInsets();
+  const canExport = visibleLessons.length > 0;
+
   return (
     <View className="flex-1 bg-background">
+      {/* Header */}
       <View
         className="flex-row items-center gap-3 px-4 pb-2 pt-3"
         style={{ paddingTop: Math.max(insets.top, 12) }}>
@@ -145,314 +233,237 @@ export default function SettingsScreen() {
         </Pressable>
         <Text className="text-lg font-bold">Settings</Text>
       </View>
-      <Separator />
 
-      <FlatList
-        className="flex-1"
-        data={hiddenRules}
-        keyExtractor={(rule) => rule.id}
-        contentContainerClassName="p-4 gap-4"
-        ListHeaderComponent={
-          <View className="gap-4">
-            {/* Class list */}
-            <View className="rounded-xl border border-border bg-card p-4">
-              <View className="flex-row items-center gap-2">
-                <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Layers size={15} color="hsl(var(--primary))" as="book-open" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-bold">
-                    {data.timetables.length > 0
-                      ? `${data.timetables.length} class${data.timetables.length === 1 ? '' : 'es'}`
-                      : 'No class synced yet'}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {data.timetables[0]?.config.schoolYear ?? 'Current school year'}
-                  </Text>
-                </View>
-              </View>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, gap: 24 }}>
+        {/* Classes */}
+        <Section title="Classes">
+          {data.timetables.length === 0 ? (
+            <Row
+              title="No class yet"
+              subtitle="Add your first class to get started"
+              onPress={() => router.push('/setup')}
+              last
+            />
+          ) : (
+            data.timetables.map((entry, index) => (
+              <Row
+                key={`${entry.config.baseUrl}-${entry.config.classId}`}
+                title={entry.config.className}
+                subtitle={`${entry.lessons.length} lessons${
+                  entry.config.schoolYear ? ` · ${entry.config.schoolYear}` : ''
+                } · ${displayBaseUrl(entry.config.baseUrl)}`}
+                right={
+                  syncing ? null : (
+                    <Pressable
+                      onPress={() => confirmRemove(entry.config)}
+                      accessibilityLabel={`Remove ${entry.config.className}`}
+                      className="h-8 w-8 items-center justify-center rounded-md active:bg-destructive/20">
+                      <Text className="text-lg leading-6 text-muted-foreground">×</Text>
+                    </Pressable>
+                  )
+                }
+                last={index === data.timetables.length - 1}
+              />
+            ))
+          )}
+          <Row
+            icon="refresh"
+            title={syncing ? 'Syncing…' : 'Sync now'}
+            subtitle={
+              data.lastSyncedAt ? `Last synced ${format(data.lastSyncedAt, 'd MMM · HH:mm')}` : 'Never synced'
+            }
+            disabled={syncing || data.timetables.length === 0}
+            onPress={() => void syncNow()}
+            last
+          />
+          <Row icon="plus" title="Add class" onPress={() => router.push('/setup')} last />
+        </Section>
 
-              {data.timetables.length > 0 && (
-                <View className="mt-3 flex-row items-center justify-between rounded-md bg-secondary px-3 py-2">
-                  <View className="flex-row items-center gap-2">
-                    <Clock3 size={13} color="hsl(var(--muted-foreground))" as="clock" />
-                    <Text className="text-xs text-muted-foreground">
-                      {data.lastSyncedAt
-                        ? `Synced ${format(data.lastSyncedAt, 'd MMM yyyy · HH:mm')}`
-                        : 'Never synced'}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center gap-1">
-                    {syncing ? (
-                      <ActivityIndicator size="small" color="hsl(var(--primary))" />
-                    ) : (
-                      <Text className="text-xs font-semibold text-muted-foreground">
-                        {visibleLessons.length} lessons
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
+        {/* Export */}
+        <View>
+          <Section title="Export">
+            <Row
+              icon="download"
+              title="Calendar file (ICS)"
+              subtitle="For Google Calendar, ICSx⁵, …"
+              disabled={!canExport}
+              onPress={() => void exportIcs()}
+            />
+            <Row
+              icon="download"
+              title="Spreadsheet (CSV)"
+              subtitle="For Excel, Sheets, …"
+              disabled={!canExport}
+              onPress={() => void exportCsv()}
+              last
+            />
+          </Section>
+          {!canExport ? (
+            <SectionCaption>Add a class first to export your timetable.</SectionCaption>
+          ) : null}
+        </View>
 
-              {data.timetables.map((entry) => {
-                return (
+        {/* Appearance */}
+        <Section title="Appearance">
+          <View className="border-b border-border px-4 py-3">
+            <Text className="text-sm font-medium">Theme</Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              {THEMES.map((theme) => (
+                <Pressable
+                  key={theme.id}
+                  onPress={() => setTheme(theme.id)}
+                  accessibilityLabel={`Theme ${theme.name}`}
+                  className={cn(
+                    'flex-row items-center gap-2 rounded-lg border px-3 py-1.5',
+                    themeId === theme.id ? 'border-primary bg-primary/10' : 'border-border bg-secondary/40'
+                  )}>
                   <View
-                    key={`${entry.config.baseUrl}-${entry.config.classId}`}
-                    className="mt-2 flex-row items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-                    <View className="flex-1">
-                      <Text className="text-sm font-semibold">{entry.config.className}</Text>
-                      <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
-                        {entry.lessons.length} lessons
-                        {entry.config.schoolYear ? ` · ${entry.config.schoolYear}` : ''} ·{' '}
-                        {displayBaseUrl(entry.config.baseUrl)}
-                      </Text>
-                    </View>
-                    {removable && (
-                      <Pressable
-                        onPress={() => confirmRemove(entry.config)}
-                        accessibilityLabel={`Remove ${entry.config.className}`}
-                        className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-destructive/20">
-                        <X size={14} color="hsl(var(--muted-foreground))" as="x" />
-                      </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-
-              <View className="mt-3 flex-row gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  disabled={syncing || data.timetables.length === 0}
-                  onPress={() => void syncNow()}>
-                  {syncing ? (
-                    <ActivityIndicator size="small" color="hsl(var(--foreground))" />
-                  ) : (
-                    <RefreshCw size={14} color="hsl(var(--foreground))" as="refresh-cw" />
-                  )}
-                  <Text>Sync now</Text>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" onPress={() => router.push('/setup')}>
-                  <Plus size={14} color="hsl(var(--foreground))" as="plus" />
-                  <Text>Add class</Text>
-                </Button>
-              </View>
-              <View className="mt-2 gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={visibleLessons.length === 0}
-                  onPress={() => void exportIcs()}>
-                  <FileDown size={14} color="hsl(var(--muted-foreground))" as="download" />
-                  <Text>Export timetable (ICS · for calendar apps)</Text>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={visibleLessons.length === 0}
-                  onPress={() => void exportCsv()}>
-                  <FileDown size={14} color="hsl(var(--muted-foreground))" as="download" />
-                  <Text>Export timetable (CSV · for spreadsheets)</Text>
-                </Button>
-              </View>
-            </View>
-
-            {/* Appearance */}
-            <View className="rounded-xl border border-border bg-card p-4">
-              <View className="flex-row items-center gap-2">
-                <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Palette size={15} color="hsl(var(--primary))" as="droplet" />
-                </View>
-                <Text className="text-sm font-bold">Appearance</Text>
-              </View>
-              <View className="mt-3 flex-row flex-wrap gap-2">
-                {THEMES.map((theme) => (
-                  <Pressable
-                    key={theme.id}
-                    onPress={() => setTheme(theme.id)}
-                    accessibilityLabel={`Theme ${theme.name}`}
+                    className="h-3 w-3 rounded-full border border-border"
+                    style={{ backgroundColor: `hsl(${theme.palette.background})` }}
+                  />
+                  <Text
                     className={cn(
-                      'flex-row items-center gap-2 rounded-lg border px-3 py-2',
-                      themeId === theme.id
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-secondary/40'
+                      'text-xs font-semibold',
+                      themeId === theme.id ? 'text-primary' : 'text-foreground'
                     )}>
-                    <View
-                      className="h-3.5 w-3.5 rounded-full border border-border"
-                      style={{ backgroundColor: `hsl(${theme.palette.background})` }}
-                    />
-                    <Text
-                      className={cn(
-                        'text-xs font-semibold',
-                        themeId === theme.id ? 'text-primary' : 'text-foreground'
-                      )}>
-                      {theme.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text className="mt-3 text-xs font-semibold text-muted-foreground">Accent</Text>
-              <View className="mt-2 flex-row flex-wrap gap-2">
-                {ACCENTS.map((accent) => (
-                  <Pressable
-                    key={accent.id}
-                    onPress={() => setAccent(accent.id)}
-                    accessibilityLabel={`Accent ${accent.name}`}
-                    className={cn(
-                      'h-8 w-8 items-center justify-center rounded-full border-2',
-                      accentId === accent.id ? 'border-primary' : 'border-transparent'
-                    )}>
-                    <View
-                      className="h-5 w-5 rounded-full"
-                      style={{
-                        backgroundColor: accent.id === 'none' ? 'hsl(var(--border))' : `hsl(${accent.hsl})`,
-                      }}
-                    />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Lesson reminders — visible on web too (disabled) so the
-                feature is discoverable; scheduling only exists on native. */}
-            <View className="rounded-xl border border-border bg-card p-4">
-              <View className="flex-row items-center gap-2">
-                <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <BellRing size={15} color="hsl(var(--primary))" as="bell" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-bold">Lesson reminders</Text>
-                  <Text className="text-xs text-muted-foreground">
-                    Notify me before a lesson starts
+                    {theme.name}
                   </Text>
-                </View>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View className="px-4 py-3">
+            <Text className="text-sm font-medium">Accent color</Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              {ACCENTS.map((accent) => (
+                <Pressable
+                  key={accent.id}
+                  onPress={() => setAccent(accent.id)}
+                  accessibilityLabel={`Accent ${accent.name}`}
+                  className={cn(
+                    'h-8 w-8 items-center justify-center rounded-full border-2',
+                    accentId === accent.id ? 'border-primary' : 'border-transparent'
+                  )}>
+                  <View
+                    className="h-5 w-5 rounded-full"
+                    style={{
+                      backgroundColor: accent.id === 'none' ? 'hsl(var(--border))' : `hsl(${accent.hsl})`,
+                    }}
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Section>
+
+        {/* Reminders */}
+        <View>
+          <Section title="Reminders">
+            <Row
+              icon="bell"
+              title="Before a lesson starts"
+              subtitle={
+                notificationsSupported()
+                  ? reminderPermission === 'denied'
+                    ? 'Blocked in system settings — enable them there'
+                    : 'Get a notification before class'
+                  : 'Only available in the mobile app'
+              }
+              right={
                 <Switch
                   checked={notificationsSupported() && data.reminders.enabled}
                   disabled={!notificationsSupported()}
                   onCheckedChange={(checked) => void toggleReminders(checked)}
                   accessibilityLabel="Enable lesson reminders"
                 />
-              </View>
-              {!notificationsSupported() ? (
-                <Text className="mt-3 text-xs text-muted-foreground">
-                  Reminders only work in the mobile app — the web version can’t schedule
-                  notifications.
-                </Text>
-              ) : (
-                <>
-                  {data.reminders.enabled && (
-                    <View className="mt-3 flex-row items-center gap-2">
-                      {REMINDER_LEAD_CHOICES.map((lead) => (
-                        <Pressable
-                          key={lead}
-                          onPress={() => void updateReminders({ leadMinutes: lead })}
-                          accessibilityLabel={`Remind ${lead} minutes before`}
-                          className={cn(
-                            'rounded-lg border px-3 py-1.5',
-                            data.reminders.leadMinutes === lead
-                              ? 'border-primary bg-primary/10'
-                              : 'border-border bg-secondary/40'
-                          )}>
-                          <Text
-                            className={cn(
-                              'text-xs font-semibold',
-                              data.reminders.leadMinutes === lead ? 'text-primary' : 'text-foreground'
-                            )}>
-                            {lead} min
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                  {reminderPermission === 'denied' && (
-                    <Text className="mt-3 text-xs text-destructive">
-                      Notifications are blocked in system settings — enable them there to get reminders.
-                    </Text>
-                  )}
-                </>
-              )}
-            </View>
-
-            {/* Info */}
-            <View className="flex-row items-start gap-2 rounded-xl border border-border bg-card px-3 py-3">
-              <Info size={14} color="hsl(var(--muted-foreground))" className="mt-0.5" as="info" />
-              <Text className="flex-1 text-xs leading-5 text-muted-foreground">
-                Everything is stored on this device. You can use the calendar offline — press
-                “Refresh” when you‘re online to pull the latest timetable.
-              </Text>
-            </View>
-
-            {/* Hidden list header */}
-            <View className="flex-row items-center justify-between">
-              <Text className="text-base font-bold">Hidden classes</Text>
-              {hiddenRules.length > 0 ? (
-                <Text className="text-xs text-muted-foreground">
-                  {hiddenRules.length} rule{hiddenRules.length === 1 ? '' : 's'}
-                </Text>
-              ) : null}
-            </View>
-            {hiddenRules.length === 0 ? (
-              <View className="items-center gap-2 rounded-xl border border-dashed border-border py-8">
-                <EyeOff size={20} color="hsl(var(--muted-foreground))" as="eye-off" />
-                <Text className="text-xs text-muted-foreground">
-                  Nothing hidden yet. Open a class on the calendar and press “Hide this class”.
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => void unhideRule(item.id)}
-            className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3 active:bg-accent">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold">{item.label}</Text>
-              <Text className="mt-0.5 text-xs text-muted-foreground">
-                {countHiddenForRule(item, lessons)} lesson
-                {countHiddenForRule(item, lessons) === 1 ? '' : 's'} across weeks
-              </Text>
-            </View>
-            <Switch
-              checked
-              onCheckedChange={() => void unhideRule(item.id)}
-              accessibilityLabel={`Unhide ${item.label}`}
+              }
+              last={!(notificationsSupported() && data.reminders.enabled)}
             />
-          </Pressable>
-        )}
-        ListEmptyComponent={null}
-        ListFooterComponent={
-          <View className="mt-2">
-            <Separator className="mb-4" />
-            {updatesSupported() ? (
-              <View className="mb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={checkingUpdate}
-                  onPress={() => void runUpdateCheck()}>
-                  {checkingUpdate ? (
-                    <ActivityIndicator size="small" color="hsl(var(--foreground))" />
-                  ) : (
-                    <RefreshCw size={14} color="hsl(var(--foreground))" as="refresh-cw" />
-                  )}
-                  <Text>Check for updates</Text>
-                </Button>
-                {updateMessage ? (
-                  <Text className="mt-2 text-center text-xs text-muted-foreground">{updateMessage}</Text>
-                ) : null}
+            {notificationsSupported() && data.reminders.enabled ? (
+              <View className="flex-row items-center gap-2 px-4 py-3">
+                {REMINDER_LEAD_CHOICES.map((lead) => (
+                  <Pressable
+                    key={lead}
+                    onPress={() => void updateReminders({ leadMinutes: lead })}
+                    accessibilityLabel={`Remind ${lead} minutes before`}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5',
+                      data.reminders.leadMinutes === lead
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-secondary/40'
+                    )}>
+                    <Text
+                      className={cn(
+                        'text-xs font-semibold',
+                        data.reminders.leadMinutes === lead ? 'text-primary' : 'text-foreground'
+                      )}>
+                      {lead} min
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
             ) : null}
-            <Button variant="destructive" size="sm" onPress={confirmReset}>
-              <Wrench size={14} color="hsl(var(--destructive-foreground))" as="tool" />
-              <Text>Clear all data</Text>
-            </Button>
-            <Text className="mt-4 text-center text-xs text-muted-foreground">
-              Actually Usable Calendar v{Constants.expoConfig?.version ?? '?'} · powered by WebUntis
-            </Text>
-          </View>
-        }
-      />
+          </Section>
+        </View>
+
+        {/* Hidden classes */}
+        <Section title={`Hidden classes${hiddenRules.length > 0 ? ` (${hiddenRules.length})` : ''}`}>
+          {hiddenRules.length === 0 ? (
+            <Row
+              icon="eye-off"
+              title="Nothing hidden"
+              subtitle="Open a lesson on the calendar and choose “Hide this class”"
+              last
+            />
+          ) : (
+            hiddenRules.map((rule, index) => (
+              <Row
+                key={rule.id}
+                icon="eye-off"
+                title={rule.label}
+                subtitle={`${countHiddenForRule(rule, lessons)} lesson${
+                  countHiddenForRule(rule, lessons) === 1 ? '' : 's'
+                } across weeks`}
+                right={
+                  <Switch
+                    checked
+                    onCheckedChange={() => void unhideRule(rule.id)}
+                    accessibilityLabel={`Unhide ${rule.label}`}
+                  />
+                }
+                last={index === hiddenRules.length - 1}
+              />
+            ))
+          )}
+        </Section>
+
+        {/* App */}
+        {updatesSupported() ? (
+          <Section title="App">
+            <Row
+              icon="refresh"
+              title="Check for updates"
+              subtitle={updateMessage ?? undefined}
+              disabled={checkingUpdate}
+              onPress={() => void runUpdateCheck()}
+              last
+            />
+          </Section>
+        ) : null}
+        {/* Destructive action gets a solid red button, not a red-text row. */}
+        <Button variant="destructive" size="lg" onPress={confirmReset}>
+          <Trash2 size={15} color="hsl(var(--destructive-foreground))" as="trash-2" />
+          <Text>Clear all data</Text>
+        </Button>
+        <SectionCaption>
+          Everything is stored on this device and works offline. Press “Sync now” when you're online
+          to pull the latest timetable.
+        </SectionCaption>
+
+        <Text className="pb-2 text-center text-xs text-muted-foreground">
+          Actually Usable Calendar v{Constants.expoConfig?.version ?? '?'} · powered by WebUntis
+        </Text>
+      </ScrollView>
     </View>
   );
 }

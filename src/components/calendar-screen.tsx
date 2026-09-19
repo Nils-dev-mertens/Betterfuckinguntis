@@ -18,7 +18,7 @@ import { WeekAgenda } from '@/components/week-agenda';
 import { WeekGrid } from '@/components/week-grid';
 import { AddLessonSheet } from '@/components/add-lesson-sheet';
 import { useCalendar } from '@/context/calendar-context';
-import { weekDays, weekStartOf } from '@/lib/time';
+import { weekDays, weekStartOf, minutesOfDay } from '@/lib/time';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
@@ -87,6 +87,30 @@ export function CalendarScreen() {
     },
     [visibleLessons]
   );
+
+  /**
+   * One fixed hour window for every grid view, so tables are always the
+   * same size and always show the same start/end time of day. Derived from
+   * ALL lessons (not the filtered/hidden subset — switching class filters
+   * or hiding lessons must never resize the table) and only stretched
+   * beyond the school window when a lesson genuinely falls outside it.
+   */
+  const sharedTimeRange = React.useMemo(() => {
+    const SCHOOL_DAY_START = 8; // 08:00
+    const SCHOOL_DAY_END = 19; // 19:00
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const lesson of lessons) {
+      min = Math.min(min, minutesOfDay(new Date(lesson.start)));
+      max = Math.max(max, minutesOfDay(new Date(lesson.end)));
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return { start: SCHOOL_DAY_START, end: SCHOOL_DAY_END };
+    }
+    const start = Math.max(0, Math.min(SCHOOL_DAY_START, Math.floor(min / 60)));
+    const end = Math.min(24, Math.max(SCHOOL_DAY_END, Math.ceil(max / 60), start + 8));
+    return { start, end };
+  }, [lessons]);
 
   const days = React.useMemo(() => weekDays(weekStartOf(anchor)), [anchor]);
 
@@ -308,6 +332,7 @@ export function CalendarScreen() {
           today={now}
           onPressLesson={setSelectedLesson}
           scrollNowIntoView={isTodayShown}
+          timeRange={sharedTimeRange}
         />
       ) : viewMode === '3d' || viewMode === '5d' ? (
         <WeekGrid
@@ -316,6 +341,7 @@ export function CalendarScreen() {
           today={now}
           onPressLesson={setSelectedLesson}
           scrollNowIntoView={isTodayShown}
+          timeRange={sharedTimeRange}
         />
       ) : (
         <WeekAgenda

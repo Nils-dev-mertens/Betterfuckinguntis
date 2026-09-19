@@ -18,6 +18,7 @@ export const EMPTY_DATA: AppData = {
   hidden: [],
   lastSyncedAt: null,
   reminders: { enabled: false, leadMinutes: 10 },
+  introSeen: false,
 };
 
 function normalizeTimetable(value: unknown): ClassTimetable | null {
@@ -72,6 +73,8 @@ export async function loadAppData(): Promise<AppData> {
           enabled: reminders.enabled === true,
           leadMinutes: reminders.leadMinutes === 5 || reminders.leadMinutes === 15 ? reminders.leadMinutes : 10,
         },
+        // Users who installed before the intro existed never see it.
+        introSeen: parsed.introSeen === true || timetables.length > 0,
       };
     }
 
@@ -90,6 +93,7 @@ export async function loadAppData(): Promise<AppData> {
           hidden: Array.isArray(legacy.hidden) ? legacy.hidden : [],
           lastSyncedAt: typeof legacy.lastSyncedAt === 'number' ? legacy.lastSyncedAt : null,
           reminders: { enabled: false, leadMinutes: 10 },
+          introSeen: true,
         };
       }
     }

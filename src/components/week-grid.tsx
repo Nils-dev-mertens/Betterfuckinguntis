@@ -8,7 +8,7 @@ import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
-const HOUR_HEIGHT = 52;
+const HOUR_HEIGHT = 64;
 const TIME_AXIS_WIDTH = 40;
 /** Fixed day-header heights; the hour axis spacer must match exactly. */
 const DAY_HEADER_HEIGHT_COMPACT = 36;
@@ -23,6 +23,12 @@ interface WeekGridProps {
   onPressLesson: (lesson: Lesson) => void;
   /** Scroll the view so the current time is visible on mount. */
   scrollNowIntoView?: boolean;
+  /**
+   * Fixed hour range shared by every view, derived in CalendarScreen from
+   * ALL visible lessons. When given, the grid never re-scales per page:
+   * navigating days/weeks keeps the same axis start/end and table height.
+   */
+  timeRange?: { start: number; end: number };
 }
 
 interface PositionedLesson {
@@ -85,9 +91,11 @@ function layoutDay(lessons: Lesson[], dayStartMinutes: number): PositionedLesson
 }
 
 /**
- * Hour labels to the left of the grid. The current hour is highlighted and
- * a red bubble marks "now" so the vertical position is readable at a
- * glance. Labels are vertically centered on the hour lines.
+ * Hour labels to the left of the grid. Each label is centered exactly on
+ * its hour line (the lines sit at the top edge of each hour row), and the
+ * axis lives inside the scroll content so labels can never drift out of
+ * alignment while scrolling. The current hour is highlighted and a red
+ * bubble marks "now".
  */
 function TimeAxis({
   startHour,
@@ -109,39 +117,52 @@ function TimeAxis({
       className="flex-shrink-0"
       style={{ width: TIME_AXIS_WIDTH }}
       pointerEvents="none">
-      {/* Spacer aligning with the day headers */}
+      {/* Spacer aligning with the day headers; its bottom border row is the
+          first hour line (startHour). */}
       <View style={{ height: headerHeight }} />
-      {Array.from({ length: hoursCount }, (_, i) => {
-        const hour = startHour + i;
-        const isNow = nowVisible && nowMinutes >= hour * 60 && nowMinutes < (hour + 1) * 60;
-        return (
+      <View style={{ height: hoursCount * HOUR_HEIGHT }}>
+        {/* Labels for startHour .. dayEnd-1, each centered on the line at
+            k * HOUR_HEIGHT (k = 0 is the header border itself). No label at
+            the very bottom edge — it would clip against the content end. */}
+        {Array.from({ length: hoursCount }, (_, k) => {
+          const hour = startHour + k;
+          const isNow = nowVisible && nowMinutes >= hour * 60 && nowMinutes < (hour + 1) * 60;
+          return (
+            <View
+              key={hour}
+              style={{
+                position: 'absolute',
+                top: k * HOUR_HEIGHT - 9,
+                left: 0,
+                right: 4,
+                height: 18,
+                justifyContent: 'center',
+              }}>
+              <Text
+                className={cn(
+                  'text-right tabular-nums',
+                  mini ? 'text-[12px]' : 'text-[13px]',
+                  isNow
+                    ? 'font-bold text-destructive'
+                    : 'font-semibold text-foreground/90'
+                )}>
+                {String(hour).padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        })}
+        {nowVisible ? (
           <View
-            key={hour}
-            style={{ height: HOUR_HEIGHT, justifyContent: 'center' }}>
-            <Text
-              className={cn(
-                'text-right tabular-nums',
-                mini ? 'text-[12px]' : 'text-[13px]',
-                isNow
-                  ? 'font-bold text-destructive'
-                  : 'font-semibold text-foreground/90'
-              )}>
-              {String(hour).padStart(2, '0')}
-            </Text>
+            className="absolute left-0 right-1 items-end"
+            style={{ top: nowOffset - 9 }}>
+            <View className="rounded bg-destructive px-1.5 py-0.5">
+              <Text className="text-[10px] font-bold tabular-nums text-destructive-foreground">
+                {format(new Date(), 'HH:mm')}
+              </Text>
+            </View>
           </View>
-        );
-      })}
-      {nowVisible ? (
-        <View
-          className="absolute left-0 right-1 items-end"
-          style={{ top: headerHeight + nowOffset - 9 }}>
-          <View className="rounded bg-destructive px-1.5 py-0.5">
-            <Text className="text-[10px] font-bold tabular-nums text-destructive-foreground">
-              {format(new Date(), 'HH:mm')}
-            </Text>
-          </View>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -157,7 +178,9 @@ function LessonCard({
 }) {
   const { lesson, top, height, leftPct, widthPct } = position;
   const { isDark } = useTheme();
-  const color = isDark ? subjectColor(lesson.subject) : lightSubjectColor(lesson.subject);
+  const color = isDark
+    ? subjectColor(lesson.subject, lesson.color)
+    : lightSubjectColor(lesson.subject, lesson.color);
 
   return (
     <Pressable
@@ -196,11 +219,22 @@ function LessonCard({
   );
 }
 
-export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowIntoView = false }: WeekGridProps) {
+export function WeekGrid({
+  days,
+  lessonsForDay,
+  today,
+  onPressLesson,
+  scrollNowIntoView = false,
+  timeRange,
+}: WeekGridProps) {
   const scrollRef = useRef<ScrollView | null>(null);
   const { isDark } = useTheme();
 
   const { dayStart, dayEnd } = useMemo(() => {
+    // Shared range from CalendarScreen: every page renders the exact same
+    // hour axis, so tables never change size while navigating.
+    if (timeRange) return { dayStart: timeRange.start, dayEnd: timeRange.end };
+    // Fallback (no shared range given): fit to the days shown.
     const minutes: number[] = [];
     for (const day of days) {
       for (const lesson of lessonsForDay(day)) {
@@ -216,7 +250,7 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
     // so early-afternoon days don't end in a tall empty band.
     const end = Math.min(24, Math.max(Math.ceil(max / 60) + 1, start + 8));
     return { dayStart: start, dayEnd: end };
-  }, [days, lessonsForDay]);
+  }, [timeRange, days, lessonsForDay]);
 
   const hoursCount = dayEnd - dayStart;
   const dayStartMinutes = dayStart * 60;
@@ -364,20 +398,22 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
 
   // Columns share the width via flex; a slim hour axis sits on the left of
   // every mode so card positions can be read without counting day headers.
+  // The axis lives INSIDE the ScrollView: labels scroll together with the
+  // hour lines and cards, so they stay perfectly aligned at any offset.
   return (
-    <View className="flex-1 w-full flex-row">
-      <TimeAxis
-        startHour={dayStart}
-        hoursCount={hoursCount}
-        nowMinutes={minutesOfDay(new Date())}
-        mini={mini}
-      />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        className="flex-1 w-full">
-        <View className="w-full flex-row">{days.map(renderDay)}</View>
-      </ScrollView>
-    </View>
+    <ScrollView
+      ref={scrollRef}
+      showsVerticalScrollIndicator={false}
+      className="flex-1 w-full">
+      <View className="w-full flex-row">
+        <TimeAxis
+          startHour={dayStart}
+          hoursCount={hoursCount}
+          nowMinutes={minutesOfDay(new Date())}
+          mini={mini}
+        />
+        {days.map(renderDay)}
+      </View>
+    </ScrollView>
   );
 }

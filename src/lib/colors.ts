@@ -58,7 +58,41 @@ function shade(hex: string, factor: number): string {
 
 const CACHE = new Map<string, SubjectColor>();
 
-function colorFor(subject: string, mode: 'dark' | 'light'): SubjectColor {
+/**
+ * Builds a SubjectColor from an explicit hex (custom colors picked when
+ * creating a manual lesson). Tints derive the same way the palette does.
+ */
+function customColor(hex: string, mode: 'dark' | 'light'): SubjectColor {
+  const key = `custom:${hex}|${mode}`;
+  const cached = CACHE.get(key);
+  if (cached) return cached;
+  const color: SubjectColor =
+    mode === 'dark'
+      ? {
+          accent: hex,
+          bg: hexToRgba(hex, 0.14),
+          text: lighten(hex, 1.35),
+        }
+      : {
+          accent: shade(hex, 0.75),
+          bg: hexToRgba(shade(hex, 0.8), 0.12),
+          text: shade(hex, 0.45),
+        };
+  CACHE.set(key, color);
+  return color;
+}
+
+/** Lightens a hex color by mixing it toward white (factor > 1). */
+function lighten(hex: string, factor: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const mix = (c: number) => Math.min(255, Math.round(c + (255 - c) * (factor - 1)));
+  const to2 = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${to2(mix(r))}${to2(mix(g))}${to2(mix(b))}`;
+}
+
+function colorFor(subject: string, mode: 'dark' | 'light', customHex?: string): SubjectColor {
+  if (customHex) return customColor(customHex, mode);
+
   const key = `${subject}|${mode}`;
   const cached = CACHE.get(key);
   if (cached) return cached;
@@ -81,11 +115,11 @@ function colorFor(subject: string, mode: 'dark' | 'light'): SubjectColor {
 }
 
 /** Subject color tuned for dark backgrounds (the default themes). */
-export function subjectColor(subject: string): SubjectColor {
-  return colorFor(subject, 'dark');
+export function subjectColor(subject: string, customHex?: string): SubjectColor {
+  return colorFor(subject, 'dark', customHex);
 }
 
 /** Subject color tuned for light backgrounds (Crimson / Light themes). */
-export function lightSubjectColor(subject: string): SubjectColor {
-  return colorFor(subject, 'light');
+export function lightSubjectColor(subject: string, customHex?: string): SubjectColor {
+  return colorFor(subject, 'light', customHex);
 }

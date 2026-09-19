@@ -1,0 +1,24 @@
+# Web app preview — exports the Expo web bundle and serves it with the
+# static server + CORS proxy from server/index.ts (bun run web:serve).
+# Build:   docker build -f Dockerfile.web -t calendar-web .
+# Run:     docker run -d -p 8080:8080 calendar-web
+FROM oven/bun:1 AS build
+WORKDIR /app
+
+# Install dependencies first (cached until the lockfile changes).
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+# Export the static web bundle → dist/
+COPY . .
+RUN bun run web:build
+
+# Serve dist/ (with the same-origin /proxy endpoint) on port 8080.
+FROM oven/bun:1
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+COPY server/index.ts ./server/index.ts
+
+ENV PORT=8080
+EXPOSE 8080
+CMD ["bun", "run", "server/index.ts"]

@@ -17,7 +17,7 @@ export default function IndexScreen() {
   }
 
   if (data.timetables.length === 0) {
-    return <Redirect href="/setup" />;
+    return data.introSeen ? <Redirect href="/setup" /> : <Redirect href="/intro" />;
   }
 
   return <CalendarScreen />;

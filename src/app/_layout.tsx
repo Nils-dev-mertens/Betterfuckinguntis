@@ -26,6 +26,7 @@ function RootNavigator() {
           animation: 'slide_from_right',
         }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="intro" options={{ animation: 'fade' }} />
         <Stack.Screen name="setup" />
         <Stack.Screen name="settings" />
       </Stack>

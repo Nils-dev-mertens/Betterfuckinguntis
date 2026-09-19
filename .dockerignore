@@ -1,3 +1,20 @@
+# Landing page Dockerfile (root Dockerfile): static site only — no build step.
 *
 !website/
 !website/index.html
+!website/server.ts
+!website/tsconfig.json
+!Dockerfile.web
+!package.json
+!bun.lock
+!server/
+!src/
+!assets/
+!app.json
+!babel.config.js
+!metro.config.js
+!nativewind-env.d.ts
+!tsconfig.json
+!expo-env.d.ts
+!components.json
+!tailwind.config.js

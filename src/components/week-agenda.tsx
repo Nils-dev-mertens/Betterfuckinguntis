@@ -69,7 +69,9 @@ function LessonRow({
   onPress: (lesson: Lesson) => void;
 }) {
   const { isDark } = useTheme();
-  const color = isDark ? subjectColor(lesson.subject) : lightSubjectColor(lesson.subject);
+  const color = isDark
+    ? subjectColor(lesson.subject, lesson.color)
+    : lightSubjectColor(lesson.subject, lesson.color);
   const weekend = day.getDay() === 0 || day.getDay() === 6;
 
   return (

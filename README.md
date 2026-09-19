@@ -32,6 +32,13 @@ bun run web:build      # expo export --platform web  → dist/
 bun run web:serve      # serves dist/ on http://localhost:8080
 ```
 
+Or run the web preview in Docker (no local bun/node needed):
+
+```sh
+docker build -f Dockerfile.web -t calendar-web .
+docker run -d -p 8080:8080 calendar-web      # → http://localhost:8080
+```
+
 Browsers require CORS preflight approval for the API's custom
 `anonymous-school` header, which WebUntis does not grant. The web build
 therefore goes through the same-origin proxy at `/proxy?url=<encoded>`
@@ -79,8 +86,15 @@ docker run -d -p 8080:80 betteruntis-site     # → http://localhost:8080
 bun run site:serve                            # local preview without Docker
 ```
 
+Both containers together (landing page on :5200, web preview on :5201):
+
+```sh
+docker compose up -d --build
+```
+
 | Pipeline | Trigger | Output |
 | --- | --- | --- |
+| `deploy.yml` | push to `main` | Rebuilds and redeploys both web containers on the own server via `docker compose` (landing page :5200, web preview :5201) |
 | `update.yml` | push to `main` | EAS OTA update (JS-only, typechecked first) |
 | `release.yml` | tag `v*.*.*` | APK built on EAS cloud, attached to a GitHub Release (= download button target) |
 

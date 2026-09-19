@@ -39,6 +39,8 @@ interface CalendarContextValue {
   syncNow: () => Promise<boolean>;
   /** Updates local reminder settings and re-schedules notifications */
   updateReminders: (settings: Partial<AppData['reminders']>) => Promise<void>;
+  /** Marks the first-launch intro as seen (done or skipped) */
+  markIntroSeen: () => Promise<void>;
   /** Removes everything, returning to onboarding */
   resetAll: () => Promise<void>;
 }
@@ -176,6 +178,10 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     setData(EMPTY_DATA);
     setSyncError(null);
   }, []);
+
+  const markIntroSeen = useCallback(async () => {
+    await persist((current) => ({ ...current, introSeen: true }));
+  }, [persist]);
 
   const updateReminders = useCallback(
     async (settings: Partial<AppData['reminders']>) => {
@@ -332,9 +338,10 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       removeLessonOccurrence,
       syncNow,
       updateReminders,
+      markIntroSeen,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, markIntroSeen, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

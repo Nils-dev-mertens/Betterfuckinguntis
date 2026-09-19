@@ -19,8 +19,6 @@ interface NowBannerProps {
  */
 export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
   const { isDark } = useTheme();
-  const subjectColorFor = (subject: string) =>
-    isDark ? subjectColor(subject) : lightSubjectColor(subject);
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const dayEnd = dayStart + 86_400_000;
   const nowMs = now.getTime();
@@ -34,6 +32,12 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
 
   if (!current && !upcoming) return null;
 
+  // Custom colors picked at creation win over the hashed subject palette.
+  const subjectColorFor = (subject: string, customHex?: string) =>
+    isDark
+      ? subjectColor(subject, customHex)
+      : lightSubjectColor(subject, customHex);
+
   return (
     <View className="mx-4 mb-2 flex-row gap-2">
       {current ? (
@@ -41,12 +45,14 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
           onPress={() => onPressLesson(current)}
           className="flex-1 flex-row items-center gap-2 rounded-lg border px-3 py-2 active:opacity-80"
           style={{
-            backgroundColor: subjectColorFor(current.subject).bg,
-            borderColor: subjectColorFor(current.subject).accent,
+            backgroundColor: subjectColorFor(current.subject, current.color).bg,
+            borderColor: subjectColorFor(current.subject, current.color).accent,
           }}
           accessibilityLabel={`Now: ${current.subject}`}>
-          <View className="h-7 w-7 items-center justify-center rounded-full">
-            <Play size={14} color={subjectColorFor(current.subject).accent} as="play" />
+          <View
+            className="h-7 w-7 items-center justify-center rounded-full"
+            style={{ backgroundColor: subjectColorFor(current.subject, current.color).accent }}>
+            <Play size={13} color="hsl(var(--background))" as="play" />
           </View>
           <View className="min-w-0 flex-1">
             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -54,7 +60,7 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
             </Text>
             <Text
               className="text-sm font-bold"
-              style={{ color: subjectColorFor(current.subject).text }}
+              style={{ color: subjectColorFor(current.subject, current.color).text }}
               numberOfLines={1}>
               {current.subject}
             </Text>
@@ -81,7 +87,7 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
             </Text>
             <Text
               className="text-sm font-bold"
-              style={{ color: subjectColorFor(upcoming.subject).text }}
+              style={{ color: subjectColorFor(upcoming.subject, upcoming.color).text }}
               numberOfLines={1}>
               {upcoming.subject}
             </Text>

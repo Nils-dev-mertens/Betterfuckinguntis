@@ -23,21 +23,21 @@ export function CalendarHeader({ currentWeek, label, classLabel, caption, onPrev
             {classLabel}
           </Text>
         ) : null}
-        <Text className="text-lg font-bold">{label ?? formatWeekLabel(currentWeek)}</Text>
+        <Text className="text-2xl font-extrabold tracking-tight">{label ?? formatWeekLabel(currentWeek)}</Text>
         {caption ? <Text className="text-[11px] text-muted-foreground">{caption}</Text> : null}
       </View>
-      <View className="flex-row items-center gap-1">
+      <View className="flex-row items-center gap-1.5">
         <Pressable
           onPress={onPrev}
           accessibilityLabel="Previous week"
-          className="h-9 w-9 items-center justify-center rounded-md border border-border bg-secondary active:bg-accent">
-          <ChevronLeft size={17} color="hsl(var(--foreground))" as="chevron-left" />
+          className="h-9 w-9 items-center justify-center rounded-full bg-secondary active:bg-accent">
+          <ChevronLeft size={18} color="hsl(var(--foreground))" as="chevron-left" />
         </Pressable>
         <Pressable
           onPress={onNext}
           accessibilityLabel="Next week"
-          className="h-9 w-9 items-center justify-center rounded-md border border-border bg-secondary active:bg-accent">
-          <ChevronRight size={17} color="hsl(var(--foreground))" as="chevron-right" />
+          className="h-9 w-9 items-center justify-center rounded-full bg-secondary active:bg-accent">
+          <ChevronRight size={18} color="hsl(var(--foreground))" as="chevron-right" />
         </Pressable>
       </View>
     </View>

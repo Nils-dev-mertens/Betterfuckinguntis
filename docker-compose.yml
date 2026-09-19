@@ -1,0 +1,27 @@
+# Both web deployments on one origin:
+#  - site  (nginx):  landing page at /, /webapp/* → web container (prefix stripped)
+#  - web   (bun):    the exported Expo web app + its /proxy CORS proxy
+#
+# The landing page's "Use it in the browser" buttons point at /webapp; the
+# site's nginx config also routes /proxy to the web container because the
+# app resolves its proxy URL against window.location.origin (site root).
+# Local:        docker compose up -d --build      → site on :5200 (webapp under /webapp)
+# Direct web:   http://localhost:5201             → web app alone (own /proxy)
+services:
+  site:
+    build: .
+    image: calendar-site
+    container_name: calendar-site
+    restart: unless-stopped
+    ports:
+      - "5200:80"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: calendar-web
+    container_name: calendar-web
+    restart: unless-stopped
+    ports:
+      - "5201:8080"

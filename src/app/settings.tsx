@@ -6,17 +6,28 @@ import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
+  BellRing,
   Clock3,
   EyeOff,
   FileDown,
   Info,
   Layers,
+  Palette,
   Plus,
   RefreshCw,
   Wrench,
   X,
 } from 'lucide-react-native';
 import { useCalendar } from '@/context/calendar-context';
+import { useTheme } from '@/context/theme-context';
+import {
+  REMINDER_LEAD_CHOICES,
+  getPermissionStatus,
+  notificationsSupported,
+  requestPermission,
+} from '@/lib/notifications';
+import { ACCENTS, THEMES } from '@/lib/themes';
+import { cn } from '@/lib/utils';
 import { countHiddenForRule } from '@/lib/hidden';
 import { displayBaseUrl } from '@/lib/sync';
 import { downloadLessonsCsv } from '@/lib/csv';
@@ -30,8 +41,27 @@ import { Switch } from '@/components/ui/switch';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { data, lessons, syncing, syncNow, unhideRule, resetAll, hiddenRules, removeClass, isHidden } =
+  const { data, lessons, syncing, syncNow, unhideRule, resetAll, hiddenRules, removeClass, isHidden, updateReminders } =
     useCalendar();
+  const { themeId, accentId, setTheme, setAccent } = useTheme();
+
+  const [reminderPermission, setReminderPermission] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (notificationsSupported()) void getPermissionStatus().then(setReminderPermission);
+  }, []);
+
+  const toggleReminders = React.useCallback(
+    async (enabled: boolean) => {
+      if (enabled) {
+        const status = await requestPermission();
+        setReminderPermission(status);
+        // Don't flip the switch on if the OS refused.
+        if (status !== 'granted') return;
+      }
+      await updateReminders({ enabled });
+    },
+    [updateReminders]
+  );
 
   const visibleLessons = React.useMemo(
     () => lessons.filter((lesson) => !isHidden(lesson)),
@@ -226,6 +256,122 @@ export default function SettingsScreen() {
                   <Text>Export timetable (CSV · for spreadsheets)</Text>
                 </Button>
               </View>
+            </View>
+
+            {/* Appearance */}
+            <View className="rounded-xl border border-border bg-card p-4">
+              <View className="flex-row items-center gap-2">
+                <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                  <Palette size={15} color="hsl(var(--primary))" />
+                </View>
+                <Text className="text-sm font-bold">Appearance</Text>
+              </View>
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {THEMES.map((theme) => (
+                  <Pressable
+                    key={theme.id}
+                    onPress={() => setTheme(theme.id)}
+                    accessibilityLabel={`Theme ${theme.name}`}
+                    className={cn(
+                      'flex-row items-center gap-2 rounded-lg border px-3 py-2',
+                      themeId === theme.id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-secondary/40'
+                    )}>
+                    <View
+                      className="h-3.5 w-3.5 rounded-full border border-border"
+                      style={{ backgroundColor: `hsl(${theme.palette.background})` }}
+                    />
+                    <Text
+                      className={cn(
+                        'text-xs font-semibold',
+                        themeId === theme.id ? 'text-primary' : 'text-foreground'
+                      )}>
+                      {theme.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text className="mt-3 text-xs font-semibold text-muted-foreground">Accent</Text>
+              <View className="mt-2 flex-row flex-wrap gap-2">
+                {ACCENTS.map((accent) => (
+                  <Pressable
+                    key={accent.id}
+                    onPress={() => setAccent(accent.id)}
+                    accessibilityLabel={`Accent ${accent.name}`}
+                    className={cn(
+                      'h-8 w-8 items-center justify-center rounded-full border-2',
+                      accentId === accent.id ? 'border-primary' : 'border-transparent'
+                    )}>
+                    <View
+                      className="h-5 w-5 rounded-full"
+                      style={{
+                        backgroundColor: accent.id === 'none' ? 'hsl(var(--border))' : `hsl(${accent.hsl})`,
+                      }}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Lesson reminders — visible on web too (disabled) so the
+                feature is discoverable; scheduling only exists on native. */}
+            <View className="rounded-xl border border-border bg-card p-4">
+              <View className="flex-row items-center gap-2">
+                <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                  <BellRing size={15} color="hsl(var(--primary))" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold">Lesson reminders</Text>
+                  <Text className="text-xs text-muted-foreground">
+                    Notify me before a lesson starts
+                  </Text>
+                </View>
+                <Switch
+                  checked={notificationsSupported() && data.reminders.enabled}
+                  disabled={!notificationsSupported()}
+                  onCheckedChange={(checked) => void toggleReminders(checked)}
+                  accessibilityLabel="Enable lesson reminders"
+                />
+              </View>
+              {!notificationsSupported() ? (
+                <Text className="mt-3 text-xs text-muted-foreground">
+                  Reminders only work in the mobile app — the web version can’t schedule
+                  notifications.
+                </Text>
+              ) : (
+                <>
+                  {data.reminders.enabled && (
+                    <View className="mt-3 flex-row items-center gap-2">
+                      {REMINDER_LEAD_CHOICES.map((lead) => (
+                        <Pressable
+                          key={lead}
+                          onPress={() => void updateReminders({ leadMinutes: lead })}
+                          accessibilityLabel={`Remind ${lead} minutes before`}
+                          className={cn(
+                            'rounded-lg border px-3 py-1.5',
+                            data.reminders.leadMinutes === lead
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border bg-secondary/40'
+                          )}>
+                          <Text
+                            className={cn(
+                              'text-xs font-semibold',
+                              data.reminders.leadMinutes === lead ? 'text-primary' : 'text-foreground'
+                            )}>
+                            {lead} min
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  {reminderPermission === 'denied' && (
+                    <Text className="mt-3 text-xs text-destructive">
+                      Notifications are blocked in system settings — enable them there to get reminders.
+                    </Text>
+                  )}
+                </>
+              )}
             </View>
 
             {/* Info */}

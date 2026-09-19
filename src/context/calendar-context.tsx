@@ -2,6 +2,7 @@ import * as React from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { clearAppData, EMPTY_DATA, loadAppData, saveAppData } from '@/lib/storage';
 import { fetchLessons } from '@/lib/sync';
+import { cancelAllReminders, scheduleLessonReminders } from '@/lib/notifications';
 import { matchesRule, ruleFromLesson } from '@/lib/hidden';
 import type { AppData, ClassTimetable, HiddenRule, Lesson, SyncConfig } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +37,8 @@ interface CalendarContextValue {
   removeLessonOccurrence: (lesson: Lesson) => Promise<void>;
   /** Refreshes the timetable of every watched class */
   syncNow: () => Promise<boolean>;
+  /** Updates local reminder settings and re-schedules notifications */
+  updateReminders: (settings: Partial<AppData['reminders']>) => Promise<void>;
   /** Removes everything, returning to onboarding */
   resetAll: () => Promise<void>;
 }
@@ -174,6 +177,16 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     setSyncError(null);
   }, []);
 
+  const updateReminders = useCallback(
+    async (settings: Partial<AppData['reminders']>) => {
+      await persist((current) => ({
+        ...current,
+        reminders: { ...current.reminders, ...settings },
+      }));
+    },
+    [persist]
+  );
+
   const addLesson = useCallback(
     async (lesson: Omit<Lesson, 'uid' | 'manual'>) => {
       const manualLesson: Lesson = {
@@ -288,6 +301,19 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     return merged;
   }, [data.timetables, expandedManualLessons]);
 
+  // Keep scheduled notifications in sync with the timetable and settings.
+  // Hidden lessons don't buzz; every change (sync, add, hide, toggle) just
+  // re-runs this — scheduling itself cancels the previous set first.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!data.reminders.enabled) {
+      void cancelAllReminders();
+      return;
+    }
+    const visible = lessons.filter((lesson) => !isHidden(lesson));
+    void scheduleLessonReminders(visible, data.reminders.leadMinutes);
+  }, [hydrated, lessons, isHidden, data.reminders.enabled, data.reminders.leadMinutes]);
+
   const value = useMemo<CalendarContextValue>(
     () => ({
       hydrated,
@@ -305,9 +331,10 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       removeLesson,
       removeLessonOccurrence,
       syncNow,
+      updateReminders,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

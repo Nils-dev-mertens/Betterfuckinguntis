@@ -2,8 +2,10 @@ import { addDays, addWeeks, format, isSameDay } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, PanResponder, Pressable, View } from 'react-native';
+import { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, Settings2, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
+import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
 import { CalendarHeader } from '@/components/calendar-header';
 import { LessonSheet } from '@/components/lesson-sheet';
 import { NowBanner } from '@/components/now-banner';
@@ -48,6 +50,8 @@ export function CalendarScreen() {
   const [now, setNow] = React.useState(() => new Date());
   /** Which watched class to show; `null` (default) combines them all. */
   const [classFilter, setClassFilter] = React.useState<ClassFilter>(null);
+  /** Direction of the last navigation step (1 = forward) — drives the slide animation. */
+  const [direction, setDirection] = React.useState(1);
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
@@ -97,12 +101,19 @@ export function CalendarScreen() {
   }, [viewMode, days, now, anchor]);
 
   /**
+   * Remount key for the enter/exit slide animation: changes only when the
+   * shown window actually moves — not on the minute-tick or class filter.
+   */
+  const animationKey = `${viewMode}-${shownDays[0]?.getTime() ?? 0}-${shownDays.length}`;
+
+  /**
    * Prev/next: weeks in Week/List; whole windows in 3d/5d. The anchor moves
    * by days, and Monday is re-derived from it every render, so stepping
    * across a week boundary keeps the Week view Monday-based.
    */
   const move = React.useCallback(
     (delta: number) => {
+      setDirection(delta >= 0 ? 1 : -1);
       if (viewMode === 'grid' || viewMode === 'list') {
         setAnchor((current) => addWeeks(current, delta));
         return;
@@ -266,6 +277,15 @@ export function CalendarScreen() {
       ) : null}
 
       <View style={{ flex: 1 }} {...swipeResponder.panHandlers}>
+        <NativeOnlyAnimatedView
+          key={animationKey}
+          entering={
+            direction === 1 ? SlideInRight.duration(220) : SlideInLeft.duration(220)
+          }
+          exiting={
+            direction === 1 ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)
+          }>
+          <View style={{ flex: 1 }}>
         {lessons.length === 0 ? (
           <View className="flex-1 items-center justify-center px-6">
           <View className="items-center gap-3">
@@ -317,7 +337,9 @@ export function CalendarScreen() {
           today={now}
           onPressLesson={setSelectedLesson}
         />
-      )}
+          )}
+          </View>
+        </NativeOnlyAnimatedView>
       </View>
 
       <LessonSheet lesson={selectedLesson} onClose={() => setSelectedLesson(null)} />

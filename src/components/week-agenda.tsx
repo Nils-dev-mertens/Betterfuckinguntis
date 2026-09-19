@@ -1,6 +1,7 @@
 import { format, isSameDay, isSameMonth } from 'date-fns';
 import { Pressable, SectionList, View } from 'react-native';
-import { subjectColor } from '@/lib/colors';
+import { lightSubjectColor, subjectColor } from '@/lib/colors';
+import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
@@ -67,7 +68,8 @@ function LessonRow({
   day: Date;
   onPress: (lesson: Lesson) => void;
 }) {
-  const color = subjectColor(lesson.subject);
+  const { isDark } = useTheme();
+  const color = isDark ? subjectColor(lesson.subject) : lightSubjectColor(lesson.subject);
   const weekend = day.getDay() === 0 || day.getDay() === 6;
 
   return (

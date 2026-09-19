@@ -1,7 +1,8 @@
 import { isSameDay, format } from 'date-fns';
 import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { subjectColor } from '@/lib/colors';
+import { lightSubjectColor, subjectColor } from '@/lib/colors';
+import { useTheme } from '@/context/theme-context';
 import { minutesOfDay } from '@/lib/time';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -155,7 +156,8 @@ function LessonCard({
   onPress: (lesson: Lesson) => void;
 }) {
   const { lesson, top, height, leftPct, widthPct } = position;
-  const color = subjectColor(lesson.subject);
+  const { isDark } = useTheme();
+  const color = isDark ? subjectColor(lesson.subject) : lightSubjectColor(lesson.subject);
 
   return (
     <Pressable
@@ -196,6 +198,7 @@ function LessonCard({
 
 export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowIntoView = false }: WeekGridProps) {
   const scrollRef = useRef<ScrollView | null>(null);
+  const { isDark } = useTheme();
 
   const { dayStart, dayEnd } = useMemo(() => {
     const minutes: number[] = [];
@@ -309,8 +312,12 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
                   right: 0,
                   height: 1,
                   backgroundColor: isNoonLine
-                    ? 'rgba(255,255,255,0.18)'
-                    : 'rgba(255,255,255,0.10)',
+                    ? isDark
+                      ? 'rgba(255,255,255,0.18)'
+                      : 'rgba(0,0,0,0.15)'
+                    : isDark
+                      ? 'rgba(255,255,255,0.10)'
+                      : 'rgba(0,0,0,0.08)',
                 }}
               />
             );
@@ -325,7 +332,7 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
                   left: 0,
                   right: 0,
                   height: 1,
-                  backgroundColor: '#ef4444',
+                  backgroundColor: 'hsl(var(--destructive))',
                 }}
               />
               <View
@@ -337,7 +344,7 @@ export function WeekGrid({ days, lessonsForDay, today, onPressLesson, scrollNowI
                   width: 6,
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: '#ef4444',
+                  backgroundColor: 'hsl(var(--destructive))',
                 }}
               />
             </>

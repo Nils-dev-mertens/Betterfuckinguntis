@@ -8,8 +8,8 @@ export interface SubjectColor {
 }
 
 /**
- * Curated palette tuned for the dark theme. Each entry is a hex color plus a
- * translucent background derived from it.
+ * Curated subject palette. Each entry is a hex accent plus a lighter text
+ * variant for dark backgrounds; light themes reuse the accent, darkened.
  */
 const PALETTE: { accent: string; text: string }[] = [
   { accent: '#8b5cf6', text: '#c4b5fd' }, // violet
@@ -35,26 +35,57 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-function hexToRgba(hex: string, alpha: number): string {
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const value = hex.replace('#', '');
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Multiplies each channel by `factor` (0–1): 0.7 = darken 30%. */
+function shade(hex: string, factor: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const to2 = (n: number) => Math.round(n * factor).toString(16).padStart(2, '0');
+  return `#${to2(r)}${to2(g)}${to2(b)}`;
 }
 
 const CACHE = new Map<string, SubjectColor>();
 
-export function subjectColor(subject: string): SubjectColor {
-  const cached = CACHE.get(subject);
+function colorFor(subject: string, mode: 'dark' | 'light'): SubjectColor {
+  const key = `${subject}|${mode}`;
+  const cached = CACHE.get(key);
   if (cached) return cached;
 
   const palette = PALETTE[hashString(subject.toLowerCase()) % PALETTE.length];
-  const color: SubjectColor = {
-    accent: palette.accent,
-    bg: hexToRgba(palette.accent, 0.14),
-    text: palette.text,
-  };
-  CACHE.set(subject, color);
+  const color: SubjectColor =
+    mode === 'dark'
+      ? {
+          accent: palette.accent,
+          bg: hexToRgba(palette.accent, 0.14),
+          text: palette.text,
+        }
+      : {
+          accent: shade(palette.accent, 0.75),
+          bg: hexToRgba(shade(palette.accent, 0.8), 0.12),
+          text: shade(palette.accent, 0.45),
+        };
+  CACHE.set(key, color);
   return color;
+}
+
+/** Subject color tuned for dark backgrounds (the default themes). */
+export function subjectColor(subject: string): SubjectColor {
+  return colorFor(subject, 'dark');
+}
+
+/** Subject color tuned for light backgrounds (Crimson / Light themes). */
+export function lightSubjectColor(subject: string): SubjectColor {
+  return colorFor(subject, 'light');
 }

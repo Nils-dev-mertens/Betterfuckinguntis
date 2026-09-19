@@ -79,6 +79,13 @@ export interface ClassTimetable {
   lessons: Lesson[];
 }
 
+/** Local lesson-reminder preferences (expo-notifications). */
+export interface Reminders {
+  enabled: boolean;
+  /** Minutes before a lesson starts that the reminder fires */
+  leadMinutes: 5 | 10 | 15;
+}
+
 export interface AppData {
   /** Every watched class with its fetched lessons */
   timetables: ClassTimetable[];
@@ -87,4 +94,6 @@ export interface AppData {
   hidden: HiddenRule[];
   /** Epoch ms of the last successful sync */
   lastSyncedAt: number | null;
+  /** Local reminder settings */
+  reminders: Reminders;
 }

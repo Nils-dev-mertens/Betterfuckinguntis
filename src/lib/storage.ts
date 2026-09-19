@@ -17,6 +17,7 @@ export const EMPTY_DATA: AppData = {
   manualLessons: [],
   hidden: [],
   lastSyncedAt: null,
+  reminders: { enabled: false, leadMinutes: 10 },
 };
 
 function normalizeTimetable(value: unknown): ClassTimetable | null {
@@ -61,11 +62,16 @@ export async function loadAppData(): Promise<AppData> {
       const timetables = (Array.isArray(parsed.timetables) ? parsed.timetables : [])
         .map(normalizeTimetable)
         .filter((entry): entry is ClassTimetable => entry !== null);
+      const reminders = (parsed.reminders ?? {}) as Partial<AppData['reminders']>;
       return {
         timetables,
         manualLessons: normalizeManualLessons(parsed.manualLessons),
         hidden: Array.isArray(parsed.hidden) ? parsed.hidden : [],
         lastSyncedAt: typeof parsed.lastSyncedAt === 'number' ? parsed.lastSyncedAt : null,
+        reminders: {
+          enabled: reminders.enabled === true,
+          leadMinutes: reminders.leadMinutes === 5 || reminders.leadMinutes === 15 ? reminders.leadMinutes : 10,
+        },
       };
     }
 
@@ -83,6 +89,7 @@ export async function loadAppData(): Promise<AppData> {
           manualLessons: [],
           hidden: Array.isArray(legacy.hidden) ? legacy.hidden : [],
           lastSyncedAt: typeof legacy.lastSyncedAt === 'number' ? legacy.lastSyncedAt : null,
+          reminders: { enabled: false, leadMinutes: 10 },
         };
       }
     }

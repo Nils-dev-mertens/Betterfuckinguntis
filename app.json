@@ -46,7 +46,14 @@
           "imageWidth": 76
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#7C5CFF",
+          "mode": "production"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -4,11 +4,14 @@
   },
   "build": {
     // Installable APK for direct download / sideloading (no store account needed).
+    // `channel` binds APKs to the EAS Update branch that update.yml publishes
+    // to — without it, installed builds have nothing to check OTA against.
     "apk": {
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "production"
     },
     // AAB for the Google Play Store.
     "production": {

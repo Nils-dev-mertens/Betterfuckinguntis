@@ -1,15 +1,14 @@
+import { Feather } from '@expo/vector-icons';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
-import type { LucideIcon, LucideProps } from 'lucide-react-native';
-import { cssInterop } from 'nativewind';
+import type { ComponentProps } from 'react';
 import * as React from 'react';
+import { cssInterop } from 'nativewind';
 
-type IconProps = LucideProps & {
-  as: LucideIcon;
-} & React.RefAttributes<LucideIcon>;
+type FeatherProps = ComponentProps<typeof Feather>;
 
-function IconImpl({ as: IconComponent, ...props }: IconProps) {
-  return <IconComponent {...props} />;
+function IconImpl({ as, ...props }: { as: string } & Omit<FeatherProps, 'name'>) {
+  return <Feather name={as as FeatherProps['name']} {...props} />;
 }
 
 cssInterop(IconImpl, {
@@ -23,30 +22,34 @@ cssInterop(IconImpl, {
 });
 
 /**
- * A wrapper component for Lucide icons with Nativewind `className` support via `cssInterop`.
+ * A wrapper component for icons with NativeWind `className` support via
+ * `cssInterop`.
  *
- * This component allows you to render any Lucide icon while applying utility classes
- * using `nativewind`. It avoids the need to wrap or configure each icon individually.
+ * Icons previously used `lucide-react-native`, which renders SVG paths via
+ * `react-native-svg` — fine in Expo Go, but the SVG native module failed to
+ * render in release APKs on some devices. Feather (via `@expo/vector-icons`)
+ * is **font-based**: glyphs render as text, so there is no native SVG
+ * dependency at all. Visually it's nearly identical — Lucide is a fork of
+ * Feather.
  *
  * @component
  * @example
  * ```tsx
- * import { ArrowRight } from 'lucide-react-native';
- * import { Icon } from '@/registry/components/ui/icon';
+ * import { Icon } from '@/components/ui/icon';
  *
- * <Icon as={ArrowRight} className="text-red-500" size={16} />
+ * <Icon as="chevron-right" className="text-red-500" size={16} />
  * ```
  *
- * @param {LucideIcon} as - The Lucide icon component to render.
- * @param {string} className - Utility classes to style the icon using Nativewind.
- * @param {number} size - Icon size (defaults to 14).
- * @param {...LucideProps} ...props - Additional Lucide icon props passed to the "as" icon.
+ * @param {string} as - Feather glyph name
+ * @param {string} className - Utility classes to style the icon using Nativewind
+ * @param {number} size - Icon size (defaults to 14)
+ * @param {...FeatherProps} ...props - All remaining props (color, style, …) pass through
  */
-function Icon({ as: IconComponent, className, size = 14, ...props }: IconProps) {
+function Icon({ as, className, size = 14, ...props }: { as: string } & Omit<FeatherProps, 'name'>) {
   const textClass = React.useContext(TextClassContext);
   return (
     <IconImpl
-      as={IconComponent}
+      as={as}
       className={cn('text-foreground', textClass, className)}
       size={size}
       {...props}

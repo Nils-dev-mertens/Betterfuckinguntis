@@ -5,19 +5,19 @@ import * as React from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
-  BellRing,
-  Clock3,
-  EyeOff,
-  FileDown,
-  Info,
-  Layers,
-  Palette,
-  Plus,
-  RefreshCw,
-  Wrench,
-  X,
-} from 'lucide-react-native';
+  Icon as ArrowLeft,
+  Icon as BellRing,
+  Icon as Clock3,
+  Icon as EyeOff,
+  Icon as FileDown,
+  Icon as Info,
+  Icon as Layers,
+  Icon as Palette,
+  Icon as Plus,
+  Icon as RefreshCw,
+  Icon as Wrench,
+  Icon as X,
+} from '@/components/ui/icon';
 import { useCalendar } from '@/context/calendar-context';
 import { useTheme } from '@/context/theme-context';
 import {
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
           onPress={() => router.back()}
           accessibilityLabel="Back"
           className="h-9 w-9 items-center justify-center rounded-md bg-secondary active:bg-accent">
-          <ArrowLeft size={17} color="hsl(var(--foreground))" />
+          <ArrowLeft size={17} color="hsl(var(--foreground))" as="arrow-left" />
         </Pressable>
         <Text className="text-lg font-bold">Settings</Text>
       </View>
@@ -158,7 +158,7 @@ export default function SettingsScreen() {
             <View className="rounded-xl border border-border bg-card p-4">
               <View className="flex-row items-center gap-2">
                 <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Layers size={15} color="hsl(var(--primary))" />
+                  <Layers size={15} color="hsl(var(--primary))" as="book-open" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-sm font-bold">
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
               {data.timetables.length > 0 && (
                 <View className="mt-3 flex-row items-center justify-between rounded-md bg-secondary px-3 py-2">
                   <View className="flex-row items-center gap-2">
-                    <Clock3 size={13} color="hsl(var(--muted-foreground))" />
+                    <Clock3 size={13} color="hsl(var(--muted-foreground))" as="clock" />
                     <Text className="text-xs text-muted-foreground">
                       {data.lastSyncedAt
                         ? `Synced ${format(data.lastSyncedAt, 'd MMM yyyy · HH:mm')}`
@@ -212,7 +212,7 @@ export default function SettingsScreen() {
                         onPress={() => confirmRemove(entry.config)}
                         accessibilityLabel={`Remove ${entry.config.className}`}
                         className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-destructive/20">
-                        <X size={14} color="hsl(var(--muted-foreground))" />
+                        <X size={14} color="hsl(var(--muted-foreground))" as="x" />
                       </Pressable>
                     )}
                   </View>
@@ -229,12 +229,12 @@ export default function SettingsScreen() {
                   {syncing ? (
                     <ActivityIndicator size="small" color="hsl(var(--foreground))" />
                   ) : (
-                    <RefreshCw size={14} color="hsl(var(--foreground))" />
+                    <RefreshCw size={14} color="hsl(var(--foreground))" as="refresh-cw" />
                   )}
                   <Text>Sync now</Text>
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1" onPress={() => router.push('/setup')}>
-                  <Plus size={14} color="hsl(var(--foreground))" />
+                  <Plus size={14} color="hsl(var(--foreground))" as="plus" />
                   <Text>Add class</Text>
                 </Button>
               </View>
@@ -244,7 +244,7 @@ export default function SettingsScreen() {
                   size="sm"
                   disabled={visibleLessons.length === 0}
                   onPress={() => void exportIcs()}>
-                  <FileDown size={14} color="hsl(var(--muted-foreground))" />
+                  <FileDown size={14} color="hsl(var(--muted-foreground))" as="download" />
                   <Text>Export timetable (ICS · for calendar apps)</Text>
                 </Button>
                 <Button
@@ -252,7 +252,7 @@ export default function SettingsScreen() {
                   size="sm"
                   disabled={visibleLessons.length === 0}
                   onPress={() => void exportCsv()}>
-                  <FileDown size={14} color="hsl(var(--muted-foreground))" />
+                  <FileDown size={14} color="hsl(var(--muted-foreground))" as="download" />
                   <Text>Export timetable (CSV · for spreadsheets)</Text>
                 </Button>
               </View>
@@ -262,7 +262,7 @@ export default function SettingsScreen() {
             <View className="rounded-xl border border-border bg-card p-4">
               <View className="flex-row items-center gap-2">
                 <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <Palette size={15} color="hsl(var(--primary))" />
+                  <Palette size={15} color="hsl(var(--primary))" as="droplet" />
                 </View>
                 <Text className="text-sm font-bold">Appearance</Text>
               </View>
@@ -319,7 +319,7 @@ export default function SettingsScreen() {
             <View className="rounded-xl border border-border bg-card p-4">
               <View className="flex-row items-center gap-2">
                 <View className="h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                  <BellRing size={15} color="hsl(var(--primary))" />
+                  <BellRing size={15} color="hsl(var(--primary))" as="bell" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-sm font-bold">Lesson reminders</Text>
@@ -376,7 +376,7 @@ export default function SettingsScreen() {
 
             {/* Info */}
             <View className="flex-row items-start gap-2 rounded-xl border border-border bg-card px-3 py-3">
-              <Info size={14} color="hsl(var(--muted-foreground))" className="mt-0.5" />
+              <Info size={14} color="hsl(var(--muted-foreground))" className="mt-0.5" as="info" />
               <Text className="flex-1 text-xs leading-5 text-muted-foreground">
                 Everything is stored on this device. You can use the calendar offline — press
                 “Refresh” when you‘re online to pull the latest timetable.
@@ -394,7 +394,7 @@ export default function SettingsScreen() {
             </View>
             {hiddenRules.length === 0 ? (
               <View className="items-center gap-2 rounded-xl border border-dashed border-border py-8">
-                <EyeOff size={20} color="hsl(var(--muted-foreground))" />
+                <EyeOff size={20} color="hsl(var(--muted-foreground))" as="eye-off" />
                 <Text className="text-xs text-muted-foreground">
                   Nothing hidden yet. Open a class on the calendar and press “Hide this class”.
                 </Text>
@@ -434,7 +434,7 @@ export default function SettingsScreen() {
                   {checkingUpdate ? (
                     <ActivityIndicator size="small" color="hsl(var(--foreground))" />
                   ) : (
-                    <RefreshCw size={14} color="hsl(var(--foreground))" />
+                    <RefreshCw size={14} color="hsl(var(--foreground))" as="refresh-cw" />
                   )}
                   <Text>Check for updates</Text>
                 </Button>
@@ -444,7 +444,7 @@ export default function SettingsScreen() {
               </View>
             ) : null}
             <Button variant="destructive" size="sm" onPress={confirmReset}>
-              <Wrench size={14} color="hsl(var(--destructive-foreground))" />
+              <Wrench size={14} color="hsl(var(--destructive-foreground))" as="tool" />
               <Text>Clear all data</Text>
             </Button>
             <Text className="mt-4 text-center text-xs text-muted-foreground">

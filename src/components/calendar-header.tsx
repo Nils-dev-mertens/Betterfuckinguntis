@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Icon as ChevronLeft, Icon as ChevronRight } from '@/components/ui/icon';
 import { Pressable, View } from 'react-native';
 import { formatWeekLabel } from '@/lib/time';
 import { Text } from '@/components/ui/text';
@@ -31,13 +31,13 @@ export function CalendarHeader({ currentWeek, label, classLabel, caption, onPrev
           onPress={onPrev}
           accessibilityLabel="Previous week"
           className="h-9 w-9 items-center justify-center rounded-md border border-border bg-secondary active:bg-accent">
-          <ChevronLeft size={17} color="hsl(var(--foreground))" />
+          <ChevronLeft size={17} color="hsl(var(--foreground))" as="chevron-left" />
         </Pressable>
         <Pressable
           onPress={onNext}
           accessibilityLabel="Next week"
           className="h-9 w-9 items-center justify-center rounded-md border border-border bg-secondary active:bg-accent">
-          <ChevronRight size={17} color="hsl(var(--foreground))" />
+          <ChevronRight size={17} color="hsl(var(--foreground))" as="chevron-right" />
         </Pressable>
       </View>
     </View>

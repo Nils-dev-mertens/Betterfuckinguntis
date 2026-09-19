@@ -2,7 +2,13 @@ import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Search, School, Check, RefreshCw } from 'lucide-react-native';
+import {
+  Icon as ArrowLeft,
+  Icon as Search,
+  Icon as School,
+  Icon as Check,
+  Icon as RefreshCw,
+} from '@/components/ui/icon';
 import { useCalendar } from '@/context/calendar-context';
 import { DEFAULT_BASE_URL, fetchClasses, fetchSchoolyears, normalizeBaseUrl } from '@/lib/sync';
 import type { SchoolClass, SchoolYear, SyncConfig } from '@/lib/types';
@@ -159,7 +165,7 @@ export default function SetupScreen() {
           onPress={goBack}
           accessibilityLabel="Back"
           className="h-9 w-9 items-center justify-center rounded-md bg-secondary active:bg-accent">
-          <ArrowLeft size={17} color="hsl(var(--foreground))" />
+          <ArrowLeft size={17} color="hsl(var(--foreground))" as="arrow-left" />
         </Pressable>
         <View>
           <Text className="text-lg font-bold">Actually Usable Calendar</Text>
@@ -274,7 +280,7 @@ export default function SetupScreen() {
           </Text>
 
           <View className="mt-4 flex-row items-center gap-2 rounded-md border border-border bg-secondary px-3">
-            <Search size={16} color="hsl(var(--muted-foreground))" />
+            <Search size={16} color="hsl(var(--muted-foreground))" as="search" />
             <Input
               value={classQuery}
               onChangeText={setClassQuery}
@@ -319,6 +325,7 @@ export default function SetupScreen() {
                         <School
                           size={16}
                           color={installed ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                          as="book-open"
                         />
                       </View>
                       <View className="flex-1 pr-2">
@@ -333,9 +340,9 @@ export default function SetupScreen() {
                     {savingClass === item.id ? (
                       <ActivityIndicator size="small" color="hsl(var(--primary))" />
                     ) : installed ? (
-                      <Check size={16} color="hsl(var(--primary))" />
+                      <Check size={16} color="hsl(var(--primary))" as="check" />
                     ) : (
-                      <Check size={16} color="hsl(var(--muted-foreground))" />
+                      <Check size={16} color="hsl(var(--muted-foreground))" as="check" />
                     )}
                   </Pressable>
                 );
@@ -346,7 +353,7 @@ export default function SetupScreen() {
             <View className="pb-4">
               <Text className="text-xs text-destructive">{error}</Text>
               <Button variant="outline" size="sm" className="mt-2" onPress={() => setError(null)}>
-                <RefreshCw size={14} color="hsl(var(--foreground))" />
+                <RefreshCw size={14} color="hsl(var(--foreground))" as="refresh-cw" />
                 <Text>Retry</Text>
               </Button>
             </View>
@@ -389,7 +396,7 @@ function SchoolyearRow({
           'h-5 w-5 items-center justify-center rounded-full border',
           selected ? 'border-primary bg-primary' : 'border-border'
         )}>
-        {selected ? <Check size={12} color="hsl(var(--primary-foreground))" /> : null}
+        {selected ? <Check size={12} color="hsl(var(--primary-foreground))" as="check" /> : null}
       </View>
     </Pressable>
   );

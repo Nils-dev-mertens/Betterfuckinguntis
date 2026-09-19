@@ -2,10 +2,15 @@ import { addDays, addWeeks, format, isSameDay } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, PanResponder, Pressable, View } from 'react-native';
-import { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Settings2, RefreshCw, EyeOff, Plus } from 'lucide-react-native';
-import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
+import {
+  Icon as ChevronLeft,
+  Icon as ChevronRight,
+  Icon as Settings2,
+  Icon as RefreshCw,
+  Icon as EyeOff,
+  Icon as Plus,
+} from '@/components/ui/icon';
 import { CalendarHeader } from '@/components/calendar-header';
 import { LessonSheet } from '@/components/lesson-sheet';
 import { NowBanner } from '@/components/now-banner';
@@ -50,8 +55,6 @@ export function CalendarScreen() {
   const [now, setNow] = React.useState(() => new Date());
   /** Which watched class to show; `null` (default) combines them all. */
   const [classFilter, setClassFilter] = React.useState<ClassFilter>(null);
-  /** Direction of the last navigation step (1 = forward) — drives the slide animation. */
-  const [direction, setDirection] = React.useState(1);
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
@@ -101,19 +104,12 @@ export function CalendarScreen() {
   }, [viewMode, days, now, anchor]);
 
   /**
-   * Remount key for the enter/exit slide animation: changes only when the
-   * shown window actually moves — not on the minute-tick or class filter.
-   */
-  const animationKey = `${viewMode}-${shownDays[0]?.getTime() ?? 0}-${shownDays.length}`;
-
-  /**
    * Prev/next: weeks in Week/List; whole windows in 3d/5d. The anchor moves
    * by days, and Monday is re-derived from it every render, so stepping
    * across a week boundary keeps the Week view Monday-based.
    */
   const move = React.useCallback(
     (delta: number) => {
-      setDirection(delta >= 0 ? 1 : -1);
       if (viewMode === 'grid' || viewMode === 'list') {
         setAnchor((current) => addWeeks(current, delta));
         return;
@@ -198,20 +194,20 @@ export function CalendarScreen() {
             {syncing ? (
               <ActivityIndicator size="small" color="hsl(var(--secondary-foreground))" />
             ) : (
-              <RefreshCw size={15} color="hsl(var(--secondary-foreground))" />
+              <RefreshCw size={15} color="hsl(var(--secondary-foreground))" as="refresh-cw" />
             )}
           </Pressable>
           <Pressable
             onPress={() => setShowAddLesson(true)}
             accessibilityLabel="Add lesson"
             className="h-8 w-8 items-center justify-center rounded-md bg-primary active:bg-primary/90">
-            <Plus size={15} color="hsl(var(--primary-foreground))" />
+            <Plus size={15} color="hsl(var(--primary-foreground))" as="plus" />
           </Pressable>
           <Pressable
             onPress={() => router.push('/settings')}
             accessibilityLabel="Open settings"
             className="h-8 w-8 items-center justify-center rounded-md bg-secondary active:bg-accent">
-            <Settings2 size={15} color="hsl(var(--secondary-foreground))" />
+            <Settings2 size={15} color="hsl(var(--secondary-foreground))" as="settings" />
           </Pressable>
         </View>
       </View>
@@ -221,7 +217,7 @@ export function CalendarScreen() {
           onPress={backToToday}
           className="mx-4 mb-2 flex-row items-center gap-1.5 self-start rounded-md border border-primary/40 bg-primary/10 px-3 py-1">
           <Text className="text-xs font-medium text-primary">Today</Text>
-          <ChevronRight size={12} color="hsl(var(--primary))" />
+          <ChevronRight size={12} color="hsl(var(--primary))" as="chevron-right" />
         </Pressable>
       )}
 
@@ -277,20 +273,11 @@ export function CalendarScreen() {
       ) : null}
 
       <View style={{ flex: 1 }} {...swipeResponder.panHandlers}>
-        <NativeOnlyAnimatedView
-          key={animationKey}
-          entering={
-            direction === 1 ? SlideInRight.duration(220) : SlideInLeft.duration(220)
-          }
-          exiting={
-            direction === 1 ? SlideOutLeft.duration(220) : SlideOutRight.duration(220)
-          }>
-          <View style={{ flex: 1 }}>
         {lessons.length === 0 ? (
           <View className="flex-1 items-center justify-center px-6">
           <View className="items-center gap-3">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-secondary">
-              <EyeOff size={24} color="hsl(var(--muted-foreground))" />
+              <EyeOff size={24} color="hsl(var(--muted-foreground))" as="eye-off" />
             </View>
             <Text className="text-center text-sm text-muted-foreground">
               No lessons to show. If this class should have data, check in Settings that the class
@@ -337,9 +324,7 @@ export function CalendarScreen() {
           today={now}
           onPressLesson={setSelectedLesson}
         />
-          )}
-          </View>
-        </NativeOnlyAnimatedView>
+      )}
       </View>
 
       <LessonSheet lesson={selectedLesson} onClose={() => setSelectedLesson(null)} />
@@ -347,7 +332,7 @@ export function CalendarScreen() {
 
       {hiddenRules.length > 0 && (
         <View className="absolute bottom-3 right-3 flex-row items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg shadow-black/40">
-          <EyeOff size={12} color="hsl(var(--muted-foreground))" />
+          <EyeOff size={12} color="hsl(var(--muted-foreground))" as="eye-off" />
           <Text className="text-[11px] text-muted-foreground">
             {hiddenRules.length} class{hiddenRules.length === 1 ? '' : 'es'} hidden
           </Text>

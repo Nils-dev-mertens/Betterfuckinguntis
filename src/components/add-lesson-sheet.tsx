@@ -11,7 +11,13 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { ChevronDown, ChevronUp, Clock, Repeat, X } from 'lucide-react-native';
+import {
+  Icon as ChevronDown,
+  Icon as ChevronUp,
+  Icon as Clock,
+  Icon as Repeat,
+  Icon as X,
+} from '@/components/ui/icon';
 import { useCalendar } from '@/context/calendar-context';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -143,7 +149,7 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
             <Pressable
               onPress={onClose}
               className="h-8 w-8 items-center justify-center rounded-md active:bg-accent">
-              <X size={18} color="hsl(var(--muted-foreground))" />
+              <X size={18} color="hsl(var(--muted-foreground))" as="x" />
             </Pressable>
           </View>
 
@@ -184,7 +190,7 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
 
             {/* Time steppers */}
             <View className="mt-3 flex-row items-center gap-2">
-              <Clock size={16} color="hsl(var(--muted-foreground))" />
+              <Clock size={16} color="hsl(var(--muted-foreground))" as="clock" />
               <Stepper
                 value={startMinutes}
                 onChange={(next) => {
@@ -222,7 +228,7 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
                   repeat === 'weekly' ? 'border-primary bg-primary' : 'border-border bg-secondary'
                 )}>
                 {repeat === 'weekly' ? (
-                  <Repeat size={12} color="hsl(var(--primary-foreground))" />
+                  <Repeat size={12} color="hsl(var(--primary-foreground))" as="repeat" />
                 ) : null}
               </View>
               <Text className="text-sm text-foreground">Repeat weekly for 3 months</Text>
@@ -233,9 +239,9 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
               onPress={() => setShowDetails((current) => !current)}
               className="mt-3 flex-row items-center gap-1 self-start rounded-md px-1 py-1 active:bg-accent">
               {showDetails ? (
-                <ChevronUp size={14} color="hsl(var(--muted-foreground))" />
+                <ChevronUp size={14} color="hsl(var(--muted-foreground))" as="chevron-up" />
               ) : (
-                <ChevronDown size={14} color="hsl(var(--muted-foreground))" />
+                <ChevronDown size={14} color="hsl(var(--muted-foreground))" as="chevron-down" />
               )}
               <Text className="text-xs font-medium text-muted-foreground">
                 {showDetails ? 'Hide details' : 'Room, teacher, note (optional)'}

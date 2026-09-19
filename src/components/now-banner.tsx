@@ -1,6 +1,6 @@
 import { differenceInMinutes, format } from 'date-fns';
 import { Pressable, View } from 'react-native';
-import { ChevronRight, Play } from 'lucide-react-native';
+import { Icon as ChevronRight, Icon as Play } from '@/components/ui/icon';
 import { lightSubjectColor, subjectColor } from '@/lib/colors';
 import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
@@ -46,7 +46,7 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
           }}
           accessibilityLabel={`Now: ${current.subject}`}>
           <View className="h-7 w-7 items-center justify-center rounded-full">
-            <Play size={14} fill={subjectColorFor(current.subject).accent} color={subjectColorFor(current.subject).accent} />
+            <Play size={14} color={subjectColorFor(current.subject).accent} as="play" />
           </View>
           <View className="min-w-0 flex-1">
             <Text className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -89,7 +89,7 @@ export function NowBanner({ lessons, now, onPressLesson }: NowBannerProps) {
               {upcoming.locations.length > 0 ? upcoming.locations.join(' / ') : 'No room'}
             </Text>
           </View>
-          <ChevronRight size={14} color="hsl(var(--muted-foreground))" />
+          <ChevronRight size={14} color="hsl(var(--muted-foreground))" as="chevron-right" />
         </Pressable>
       ) : null}
     </View>

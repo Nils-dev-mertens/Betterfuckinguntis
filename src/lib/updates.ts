@@ -20,6 +20,15 @@ export interface CheckResult {
   message: string;
 }
 
+/** Build info appended to failures so OTA problems are diagnosable in-app. */
+function diagnostics(): string {
+  const parts = [
+    `runtime=${Updates.runtimeVersion ?? 'none'}`,
+    `channel=${Updates.channel ?? 'none'}`,
+  ];
+  return parts.join(', ');
+}
+
 export async function checkForUpdate(): Promise<CheckResult> {
   if (!updatesSupported()) {
     return { applied: false, message: 'Not available (dev build or web).' };
@@ -33,9 +42,15 @@ export async function checkForUpdate(): Promise<CheckResult> {
     await Updates.reloadAsync();
     return { applied: true, message: 'Updated! Reloading…' };
   } catch (error) {
+    const detail =
+      error instanceof Error
+        ? `${error.message}${error.cause instanceof Error ? ` (${error.cause.message})` : ''}`
+        : 'unknown error';
     return {
       applied: false,
-      message: error instanceof Error ? `Update check failed: ${error.message}` : 'Update check failed.',
+      // The channel/runtime pair is what EAS Update validates: a mismatch
+      // or a missing channel is the usual reason for "request rejected".
+      message: `Update check failed: ${detail} [${diagnostics()}]`,
     };
   }
 }

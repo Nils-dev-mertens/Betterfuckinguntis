@@ -15,6 +15,8 @@ const DAY_HEADER_HEIGHT_COMPACT = 36;
 const DAY_HEADER_HEIGHT = 48;
 const DEFAULT_DAY_START = 7; // 07:00
 const DEFAULT_DAY_END = 20; // 20:00
+/** Cards shorter than this (px) hide the room line so subject/time stay readable. */
+const ROOM_MIN_CARD_HEIGHT = 44;
 
 interface WeekGridProps {
   days: Date[];
@@ -181,6 +183,7 @@ function LessonCard({
   const color = isDark
     ? subjectColor(lesson.subject, lesson.color)
     : lightSubjectColor(lesson.subject, lesson.color);
+  const room = lesson.locations.join(' / ');
 
   return (
     <Pressable
@@ -196,24 +199,37 @@ function LessonCard({
         borderLeftColor: color.accent,
         borderLeftWidth: mini ? 2 : 3,
       }}>
-      <View className={mini ? 'px-0.5 py-0.5' : 'px-1 py-0.5'}>
-        <Text
-          className={cn(
-            'font-bold leading-tight',
-            mini ? 'text-[9px]' : 'text-[11px]'
-          )}
-          style={{ color: color.text }}
-          numberOfLines={mini ? 2 : 2}>
-          {lesson.subject}
-        </Text>
-        <Text
-          className={cn(
-            'mt-0.5 leading-tight text-muted-foreground tabular-nums',
-            mini ? 'text-[8px]' : 'text-[9px]'
-          )}>
-          {format(lesson.start, 'HH:mm')}
-          {mini ? '' : `–${format(lesson.end, 'HH:mm')}`}
-        </Text>
+      <View className={cn('flex-1', mini ? 'px-0.5 py-0.5' : 'px-1 py-0.5')}>
+        <View className="flex-shrink overflow-hidden">
+          <Text
+            className={cn(
+              'font-bold leading-tight',
+              mini ? 'text-[9px]' : 'text-[11px]'
+            )}
+            style={{ color: color.text }}
+            numberOfLines={mini ? 2 : 2}>
+            {lesson.subject}
+          </Text>
+          <Text
+            className={cn(
+              'mt-0.5 leading-tight text-muted-foreground tabular-nums',
+              mini ? 'text-[8px]' : 'text-[9px]'
+            )}>
+            {format(lesson.start, 'HH:mm')}
+            {mini ? '' : `–${format(lesson.end, 'HH:mm')}`}
+          </Text>
+        </View>
+        {/* Room pinned to the bottom-left; skipped on cards too short to fit it */}
+        {room && height >= ROOM_MIN_CARD_HEIGHT ? (
+          <Text
+            className={cn(
+              'mt-auto flex-shrink-0 font-semibold leading-tight text-muted-foreground',
+              mini ? 'text-[8px]' : 'text-[9px]'
+            )}
+            numberOfLines={1}>
+            {room}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );

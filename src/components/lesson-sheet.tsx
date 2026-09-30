@@ -83,8 +83,11 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
         {/** theme vars re-declared so the sheet follows the picked theme */}
         <Backdrop onPress={onClose} />
         <Card
-          className="w-full rounded-b-none rounded-t-2xl border-x-0 border-b-0 web:max-w-md web:rounded-2xl web:border"
-          style={{ backgroundColor: 'hsl(var(--card))' }}>
+          // Background comes from Card's own `bg-card` class. An inline
+          // `hsl(var(--card))` would bypass NativeWind, which is what
+          // resolves the CSS variable on native — React Native's colour
+          // parser cannot read `var()`, so the sheet rendered transparent.
+          className="w-full rounded-b-none rounded-t-2xl border-x-0 border-b-0 web:max-w-md web:rounded-2xl web:border">
           <CardHeader>
             <View className="flex-row items-center gap-2">
               <View className="h-6 w-2 rounded-full" style={{ backgroundColor: color.accent }} />

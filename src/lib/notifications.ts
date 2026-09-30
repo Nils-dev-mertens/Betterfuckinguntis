@@ -136,14 +136,7 @@ export async function scheduleLessonReminders(
           body: `${formatTime(sample.start)}–${formatTime(sample.end)}${room}`,
           sound: false,
         },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          channelId: CHANNEL_ID,
-          repeats: true,
-          weekday: slot.dayOfWeek,
-          hour: slot.hour,
-          minute: slot.minute,
-        },
+        trigger: buildWeeklyTrigger(slot),
       });
       count += 1;
     } catch (error) {
@@ -169,6 +162,38 @@ function describeError(error: unknown, context: string): string {
 
 function keyOf(slot: WeeklySlot): string {
   return `${slot.dayOfWeek}-${slot.hour}-${slot.minute}`;
+}
+
+/**
+ * The two platforms need different trigger types for the same "every week at
+ * HH:MM" intent.
+ *
+ * `CALENDAR` is iOS-only. Android's NotificationScheduler accepts timeInterval,
+ * date, daily, weekly, monthly and yearly — anything else throws
+ * "Trigger of type: calendar is not supported on Android". Its `weekly` trigger
+ * is the equivalent, and is inherently repeating (no `repeats` flag).
+ *
+ * Both number weekdays the same way, 1 = Sunday (Android maps straight onto
+ * `Calendar.DAY_OF_WEEK`), so `slot.dayOfWeek` is correct for either.
+ */
+function buildWeeklyTrigger(slot: WeeklySlot): Notifications.SchedulableNotificationTriggerInput {
+  if (Platform.OS === 'android') {
+    return {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      channelId: CHANNEL_ID,
+      weekday: slot.dayOfWeek,
+      hour: slot.hour,
+      minute: slot.minute,
+    };
+  }
+  return {
+    type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+    channelId: CHANNEL_ID,
+    repeats: true,
+    weekday: slot.dayOfWeek,
+    hour: slot.hour,
+    minute: slot.minute,
+  };
 }
 
 function formatTime(ms: number): string {

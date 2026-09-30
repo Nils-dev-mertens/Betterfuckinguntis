@@ -376,26 +376,16 @@ export function WeekGrid({
             <>
               <View
                 pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: nowLine,
-                  left: 0,
-                  right: 0,
-                  height: 1,
-                  backgroundColor: 'hsl(var(--destructive))',
-                }}
+                // Colour via className, not an inline hsl(var(--…)) — only
+                // NativeWind resolves CSS variables on native, so the inline
+                // form left the "now" line invisible on Android.
+                className="absolute left-0 right-0 h-px bg-destructive"
+                style={{ top: nowLine }}
               />
               <View
                 pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: nowLine - 3,
-                  left: -2,
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: 'hsl(var(--destructive))',
-                }}
+                className="absolute h-1.5 w-1.5 rounded-full bg-destructive"
+                style={{ top: nowLine - 3, left: -2 }}
               />
             </>
           )}

@@ -34,7 +34,7 @@
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/actually-usable-calendar"
+      "url": "https://u.expo.dev/c39a97ae-7428-4071-b781-0dbdb40e7915"
     },
     "plugins": [
       "expo-router",

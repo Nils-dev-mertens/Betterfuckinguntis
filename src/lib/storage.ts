@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppData, ClassTimetable, Lesson } from './types';
+import type { AppData, ClassTimetable, DisplaySettings, Lesson, ViewMode } from './types';
 
 const STORAGE_KEY = 'auch:app:v2';
 const LEGACY_KEY = 'auch:app:v1';
@@ -18,8 +18,21 @@ export const EMPTY_DATA: AppData = {
   hidden: [],
   lastSyncedAt: null,
   reminders: { enabled: false, leadMinutes: 10 },
+  display: { defaultView: '5d', showWeekend: true },
   introSeen: false,
 };
+
+const VIEW_MODES: ViewMode[] = ['3d', '5d', 'grid', 'list'];
+
+function normalizeDisplay(value: unknown): DisplaySettings {
+  const display = (value ?? {}) as Partial<DisplaySettings>;
+  return {
+    defaultView: VIEW_MODES.includes(display.defaultView as ViewMode)
+      ? (display.defaultView as ViewMode)
+      : EMPTY_DATA.display.defaultView,
+    showWeekend: display.showWeekend !== false,
+  };
+}
 
 function normalizeTimetable(value: unknown): ClassTimetable | null {
   if (!value || typeof value !== 'object') return null;
@@ -73,6 +86,7 @@ export async function loadAppData(): Promise<AppData> {
           enabled: reminders.enabled === true,
           leadMinutes: reminders.leadMinutes === 5 || reminders.leadMinutes === 15 ? reminders.leadMinutes : 10,
         },
+        display: normalizeDisplay(parsed.display),
         // Users who installed before the intro existed never see it.
         introSeen: parsed.introSeen === true || timetables.length > 0,
       };
@@ -93,6 +107,7 @@ export async function loadAppData(): Promise<AppData> {
           hidden: Array.isArray(legacy.hidden) ? legacy.hidden : [],
           lastSyncedAt: typeof legacy.lastSyncedAt === 'number' ? legacy.lastSyncedAt : null,
           reminders: { enabled: false, leadMinutes: 10 },
+          display: EMPTY_DATA.display,
           introSeen: true,
         };
       }

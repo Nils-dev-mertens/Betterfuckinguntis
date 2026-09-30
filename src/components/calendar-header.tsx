@@ -5,6 +5,8 @@ import { Text } from '@/components/ui/text';
 
 interface CalendarHeaderProps {
   currentWeek: Date;
+  /** Number of days in the displayed week (5 when weekends are hidden). */
+  weekLength?: number;
   /** Optional label override; defaults to the week label of `currentWeek`. */
   label?: string;
   classLabel?: string;
@@ -14,7 +16,7 @@ interface CalendarHeaderProps {
   onNext: () => void;
 }
 
-export function CalendarHeader({ currentWeek, label, classLabel, caption, onPrev, onNext }: CalendarHeaderProps) {
+export function CalendarHeader({ currentWeek, weekLength, label, classLabel, caption, onPrev, onNext }: CalendarHeaderProps) {
   return (
     <View className="flex-row items-center justify-between px-4 pb-2 pt-3">
       <View className="flex-1">
@@ -23,7 +25,7 @@ export function CalendarHeader({ currentWeek, label, classLabel, caption, onPrev
             {classLabel}
           </Text>
         ) : null}
-        <Text className="text-2xl font-extrabold tracking-tight">{label ?? formatWeekLabel(currentWeek)}</Text>
+        <Text className="text-2xl font-extrabold tracking-tight">{label ?? formatWeekLabel(currentWeek, weekLength)}</Text>
         {caption ? <Text className="text-[11px] text-muted-foreground">{caption}</Text> : null}
       </View>
       <View className="flex-row items-center gap-1.5">

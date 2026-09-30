@@ -13,6 +13,7 @@ import {
   Icon as RefreshCw,
   Icon as Trash2,
 } from '@/components/ui/icon';
+import { VIEW_MODES } from '@/components/calendar-screen';
 import { useCalendar } from '@/context/calendar-context';
 import { useTheme } from '@/context/theme-context';
 import {
@@ -131,6 +132,7 @@ export default function SettingsScreen() {
     removeClass,
     isHidden,
     updateReminders,
+    updateDisplay,
   } = useCalendar();
   const { themeId, accentId, setTheme, setAccent } = useTheme();
 
@@ -354,6 +356,52 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
+        </Section>
+
+        {/* Calendar view */}
+        <Section title="Calendar">
+          <View className="gap-2 border-b border-border px-4 py-3">
+            <View>
+              <Text className="text-sm font-medium">Open on</Text>
+              <Text className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                The view shown when the app starts
+              </Text>
+            </View>
+            <View className="flex-row flex-wrap gap-2">
+              {VIEW_MODES.map((mode) => (
+                <Pressable
+                  key={mode.key}
+                  onPress={() => void updateDisplay({ defaultView: mode.key })}
+                  accessibilityLabel={`Open on ${mode.label} view`}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5',
+                    data.display.defaultView === mode.key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-secondary/40'
+                  )}>
+                  <Text
+                    className={cn(
+                      'text-xs font-semibold',
+                      data.display.defaultView === mode.key ? 'text-primary' : 'text-foreground'
+                    )}>
+                    {mode.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <Row
+            title="Show weekend"
+            subtitle="Saturday & Sunday, incl. makeup lessons"
+            right={
+              <Switch
+                checked={data.display.showWeekend}
+                onCheckedChange={(checked) => void updateDisplay({ showWeekend: checked })}
+                accessibilityLabel="Show weekend"
+              />
+            }
+            last
+          />
         </Section>
 
         {/* Reminders */}

@@ -10,6 +10,31 @@ export function weekDays(weekStart: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 }
 
+export function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+/** `date` itself, or — when weekends are hidden — the Monday after it if it falls on a weekend. */
+export function firstVisibleDay(date: Date, showWeekend: boolean): Date {
+  let day = date;
+  while (!showWeekend && isWeekend(day)) day = addDays(day, 1);
+  return day;
+}
+
+/** Moves `count` shown days from `date` (negative = backwards), skipping weekends when hidden. */
+export function stepVisibleDays(date: Date, count: number, showWeekend: boolean): Date {
+  if (showWeekend) return addDays(date, count);
+  const direction = Math.sign(count);
+  let day = date;
+  let remaining = Math.abs(count);
+  while (remaining > 0) {
+    day = addDays(day, direction);
+    if (!isWeekend(day)) remaining--;
+  }
+  return day;
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -22,8 +47,8 @@ export function sameWeek(a: Date, b: Date): boolean {
   return weekStartOf(a).getTime() === weekStartOf(b).getTime();
 }
 
-export function formatWeekLabel(weekStart: Date): string {
-  const end = addDays(weekStart, 6);
+export function formatWeekLabel(weekStart: Date, length = 7): string {
+  const end = addDays(weekStart, length - 1);
   const sameMonth = weekStart.getMonth() === end.getMonth();
   if (sameMonth) return `${format(weekStart, 'd')}–${format(end, 'd MMMM yyyy')}`;
   return `${format(weekStart, 'd MMM')} – ${format(end, 'd MMM yyyy')}`;

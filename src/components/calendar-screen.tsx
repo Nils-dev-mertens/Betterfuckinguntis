@@ -1,4 +1,4 @@
-import { addDays, addWeeks, format, isSameDay } from 'date-fns';
+import { addWeeks, format, isSameDay } from 'date-fns';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ActivityIndicator, PanResponder, Pressable, View } from 'react-native';
@@ -18,19 +18,25 @@ import { WeekAgenda } from '@/components/week-agenda';
 import { WeekGrid } from '@/components/week-grid';
 import { AddLessonSheet } from '@/components/add-lesson-sheet';
 import { useCalendar } from '@/context/calendar-context';
-import { weekDays, weekStartOf, minutesOfDay } from '@/lib/time';
-import type { Lesson } from '@/lib/types';
+import {
+  firstVisibleDay,
+  isWeekend,
+  minutesOfDay,
+  stepVisibleDays,
+  weekDays,
+  weekStartOf,
+} from '@/lib/time';
+import type { Lesson, ViewMode } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
-type ViewMode = '3d' | '5d' | 'grid' | 'list';
 /**
  * `null` = all watched classes combined; otherwise the WebUntis class id of
  * a watched class. Ids (not names) because names can repeat across years.
  */
 type ClassFilter = number | null;
 
-const SPANS: { key: ViewMode; label: string }[] = [
+export const VIEW_MODES: { key: ViewMode; label: string }[] = [
   { key: '3d', label: '3d' },
   { key: '5d', label: '5d' },
   { key: 'grid', label: 'Week' },
@@ -49,7 +55,10 @@ export function CalendarScreen() {
    * Week view could open on e.g. a Thursday.
    */
   const [anchor, setAnchor] = React.useState<Date>(() => new Date());
-  const [viewMode, setViewMode] = React.useState<ViewMode>('5d');
+  const { defaultView, showWeekend } = data.display;
+  const [viewMode, setViewMode] = React.useState<ViewMode>(defaultView);
+  // Changing the default in Settings applies right away when coming back.
+  React.useEffect(() => setViewMode(defaultView), [defaultView]);
   const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
   const [showAddLesson, setShowAddLesson] = React.useState(false);
   const [now, setNow] = React.useState(() => new Date());
@@ -112,20 +121,27 @@ export function CalendarScreen() {
     return { start, end };
   }, [lessons]);
 
-  const days = React.useMemo(() => weekDays(weekStartOf(anchor)), [anchor]);
+  /** With weekends hidden, a Saturday/Sunday anchor rolls on to Monday. */
+  const visibleAnchor = React.useMemo(
+    () => firstVisibleDay(anchor, showWeekend),
+    [anchor, showWeekend]
+  );
+
+  const days = React.useMemo(
+    () =>
+      weekDays(weekStartOf(visibleAnchor)).filter((day) => showWeekend || !isWeekend(day)),
+    [visibleAnchor, showWeekend]
+  );
 
   /**
-   * Days shown by the current view mode. 3d/5d roll from today, wrapping
-   * into next week when the window would leave the displayed week.
+   * Days shown by the current view mode. 3d/5d roll from the anchor, running
+   * on into next week (and skipping Sat/Sun when weekends are hidden).
    */
   const shownDays = React.useMemo(() => {
     if (viewMode === 'grid' || viewMode === 'list') return days;
     const count = viewMode === '3d' ? 3 : 5;
-    const todayIndex = days.findIndex((day) => isSameDay(day, now));
-    const anchorIndex = days.findIndex((day) => isSameDay(day, anchor));
-    const index = anchorIndex >= 0 ? anchorIndex : todayIndex >= 0 ? todayIndex : 0;
-    return Array.from({ length: count }, (_, i) => addDays(days[index] ?? days[0], i));
-  }, [viewMode, days, now, anchor]);
+    return Array.from({ length: count }, (_, i) => stepVisibleDays(visibleAnchor, i, showWeekend));
+  }, [viewMode, days, visibleAnchor, showWeekend]);
 
   /**
    * Prev/next: weeks in Week/List; whole windows in 3d/5d. The anchor moves
@@ -138,12 +154,17 @@ export function CalendarScreen() {
         setAnchor((current) => addWeeks(current, delta));
         return;
       }
-      setAnchor((current) => addDays(current, delta * (viewMode === '3d' ? 3 : 5)));
+      const count = viewMode === '3d' ? 3 : 5;
+      setAnchor((current) =>
+        stepVisibleDays(firstVisibleDay(current, showWeekend), delta * count, showWeekend)
+      );
     },
-    [viewMode]
+    [viewMode, showWeekend]
   );
 
   const isTodayShown = shownDays.some((day) => isSameDay(day, now));
+  /** Where "Today" jumps to: today, or next Monday on a hidden weekend. */
+  const isHomeShown = shownDays.some((day) => isSameDay(day, firstVisibleDay(now, showWeekend)));
 
   const backToToday = React.useCallback(() => setAnchor(new Date()), []);
 
@@ -170,7 +191,8 @@ export function CalendarScreen() {
       className="flex-1 bg-background"
       style={{ paddingTop: insets.top }}>
       <CalendarHeader
-        currentWeek={weekStartOf(anchor)}
+        currentWeek={weekStartOf(visibleAnchor)}
+        weekLength={days.length}
         label={
           viewMode === '3d' || viewMode === '5d'
             ? `${format(shownDays[0], 'EEE d MMM')} – ${format(shownDays[shownDays.length - 1], 'EEE d MMM')}`
@@ -190,7 +212,7 @@ export function CalendarScreen() {
       {/* Toolbar: spans left, actions right (synced time lives in the header) */}
       <View className="flex-row items-center justify-between gap-2 px-4 pb-2">
         <View className="flex-row items-center gap-1 rounded-md border border-border bg-secondary p-0.5">
-          {SPANS.map((span) => (
+          {VIEW_MODES.map((span) => (
             <Pressable
               key={span.key}
               onPress={() => setViewMode(span.key)}
@@ -236,7 +258,7 @@ export function CalendarScreen() {
         </View>
       </View>
 
-      {!isTodayShown && (
+      {!isHomeShown && (
         <Pressable
           onPress={backToToday}
           className="mx-4 mb-2 flex-row items-center gap-1.5 self-start rounded-md border border-primary/40 bg-primary/10 px-3 py-1">

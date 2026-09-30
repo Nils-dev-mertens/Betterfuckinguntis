@@ -88,6 +88,17 @@ export interface Reminders {
   leadMinutes: 5 | 10 | 15;
 }
 
+/** Calendar view modes: rolling 3/5-day windows, full week grid, agenda list. */
+export type ViewMode = '3d' | '5d' | 'grid' | 'list';
+
+/** How the calendar is laid out when the app opens. */
+export interface DisplaySettings {
+  /** View the calendar opens on */
+  defaultView: ViewMode;
+  /** Whether Saturday and Sunday are shown */
+  showWeekend: boolean;
+}
+
 export interface AppData {
   /** Every watched class with its fetched lessons */
   timetables: ClassTimetable[];
@@ -98,6 +109,8 @@ export interface AppData {
   lastSyncedAt: number | null;
   /** Local reminder settings */
   reminders: Reminders;
+  /** Calendar layout preferences */
+  display: DisplaySettings;
   /** Whether the first-launch intro has been shown (skipped counts too) */
   introSeen: boolean;
 }

@@ -36,6 +36,7 @@
         --faint: #6d7986;
         --accent: #4db6a4;
         --accent-hover: #63c9b6;
+        --accent-soft: rgba(77, 182, 164, 0.14);
         --accent-ink: #06231f;
         --ok: #4db6a4;
         --warn: #d0a24a;
@@ -85,50 +86,6 @@
         padding: 0 clamp(20px, 4vw, 32px);
       }
 
-      /* ── masthead ──────────────────────────────────────────── */
-      .masthead {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 22px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .wordmark {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 15px;
-        font-weight: 650;
-        letter-spacing: -0.01em;
-        color: var(--text);
-        text-decoration: none;
-      }
-      .wordmark .dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 2px;
-        background: var(--accent);
-        flex: none;
-      }
-      .masthead nav {
-        display: flex;
-        gap: 20px;
-        font-size: 14px;
-      }
-      .masthead nav a {
-        color: var(--muted);
-        text-decoration: none;
-      }
-      .masthead nav a:hover {
-        color: var(--text);
-      }
-      @media (max-width: 560px) {
-        .masthead nav a.nav-hide {
-          display: none;
-        }
-      }
-
       /* ── hero ──────────────────────────────────────────────── */
       .hero {
         display: grid;
@@ -145,25 +102,20 @@
           justify-self: center;
         }
       }
-      .eyebrow {
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: var(--faint);
-      }
+      /* The one moment on the page that shouts: everything else stays quiet. */
       .hero-title {
-        margin-top: 14px;
-        font-size: clamp(32px, 5.2vw, 50px);
+        font-size: clamp(34px, 6.6vw, 62px);
         font-weight: 700;
-        line-height: 1.12;
-        letter-spacing: -0.028em;
+        line-height: 1.06;
+        letter-spacing: -0.032em;
+        max-width: 15ch;
       }
       .hero-sub {
-        margin-top: 18px;
-        max-width: 54ch;
+        margin-top: 20px;
+        max-width: 46ch;
         color: var(--muted);
-        font-size: clamp(16px, 2vw, 17.5px);
+        font-size: clamp(16.5px, 2.1vw, 19px);
+        line-height: 1.55;
       }
       .actions {
         display: flex;
@@ -277,27 +229,6 @@
       }
       .stat .stat-sub a:hover {
         color: var(--accent);
-      }
-      .status-note {
-        margin-top: 10px;
-        font-size: 12.5px;
-        color: var(--faint);
-      }
-      .state {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-      }
-      .state::before {
-        content: '';
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: var(--ok);
-        flex: none;
-      }
-      .state.unknown::before {
-        background: var(--faint);
       }
 
       /* ── phone mockup ──────────────────────────────────────── */
@@ -607,10 +538,10 @@
 
       .steps ol {
         list-style: none;
-        margin-top: 28px;
+        margin-top: 30px;
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: clamp(20px, 4vw, 36px);
+        gap: clamp(16px, 2.4vw, 22px);
         counter-reset: step;
       }
       @media (max-width: 680px) {
@@ -618,38 +549,124 @@
           grid-template-columns: 1fr;
         }
       }
+      /* Install steps. Between the feature list and the CTA these sat almost
+         invisibly, so each step becomes its own bordered card with a real
+         numbered marker — the sequence is now something you can see. */
       .step {
-        border-top: 1px solid var(--border-strong);
-        padding-top: 16px;
+        position: relative;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-raised);
+        padding: 22px 20px 24px;
       }
       .step em {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--accent-soft);
+        border: 1px solid rgba(77, 182, 164, 0.35);
+        color: var(--accent-hover);
         font-style: normal;
-        font-size: 13px;
-        font-weight: 650;
-        letter-spacing: 0.04em;
-        color: var(--faint);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0;
+        margin-bottom: 16px;
       }
       .step b {
         display: block;
-        margin-top: 8px;
-        font-size: 16px;
+        font-size: 16.5px;
         font-weight: 650;
       }
       .step span {
         display: block;
-        margin-top: 6px;
+        margin-top: 7px;
         color: var(--muted);
         font-size: 14.5px;
       }
 
+      /* Closing CTA. The last thing a visitor reads has to outrank everything
+         above it, so instead of another plain section this is a lifted card:
+         its own surface, its own border, an accent rule on top, and the
+         largest type on the page after the hero. */
       .cta {
-        text-align: left;
+        position: relative;
+        text-align: center;
+        margin: clamp(36px, 5vw, 56px) 0 0;
+        padding: clamp(40px, 6vw, 64px) clamp(20px, 4vw, 56px);
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        background:
+          radial-gradient(
+            120% 130% at 50% 0%,
+            rgba(77, 182, 164, 0.12),
+            transparent 60%
+          ),
+          var(--bg-raised);
+        overflow: hidden;
+      }
+      /* Accent rule across the top edge: the one place the brand colour is
+         used as structure rather than as text. */
+      .cta::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      }
+      .cta h2 {
+        max-width: 24ch;
+        margin: 0 auto;
+        font-size: clamp(26px, 4.4vw, 40px);
+        font-weight: 700;
+        letter-spacing: -0.028em;
+        line-height: 1.1;
       }
       .cta p {
-        margin-top: 12px;
-        max-width: 58ch;
+        margin: 16px auto 0;
+        max-width: 44ch;
         color: var(--muted);
+        font-size: clamp(15px, 1.8vw, 16.5px);
+      }
+      .cta .actions {
+        justify-content: center;
+        margin-top: 34px;
+      }
+      /* Below ~440px the padded buttons no longer fit side by side. */
+      @media (max-width: 440px) {
+        .cta .actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .cta .btn {
+          /* nowrap + a long version label is wider than the card, so the
+             label wraps and the box grows instead of overflowing. */
+          white-space: normal;
+          max-width: 100%;
+          height: auto;
+          min-height: 52px;
+          padding: 12px 16px;
+          font-size: 15.5px;
+        }
+      }
+      /* Larger than the hero buttons — this is the primary ask of the page. */
+      .cta .btn {
+        height: 58px;
+        padding: 0 32px;
+        font-size: 17px;
+        border-radius: 10px;
+        /* Keeps the icon and the label on one line on narrow screens. */
+        white-space: nowrap;
+      }
+      .cta .btn:not(.secondary) {
+        box-shadow: 0 14px 40px -14px rgba(77, 182, 164, 0.6);
+      }
+      .cta .fineprint {
+        margin-top: 20px;
+        font-size: 13.5px;
+        color: var(--faint);
       }
       .try-line {
         margin-top: 22px;
@@ -665,14 +682,18 @@
         border-bottom-color: var(--accent);
       }
 
-      footer {
+      /* The footer is also `.wrap`, and a class selector outranks a bare element
+         one — so this must be `footer.wrap`, otherwise `.wrap`'s `margin:
+0 auto` silently wins and the spacing never applies. */
+      footer.wrap {
+        margin-top: clamp(56px, 8vw, 96px);
         border-top: 1px solid var(--border);
-        padding: 26px 0 40px;
+        padding: 40px 0 72px;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 10px 20px;
+        gap: 14px 20px;
         font-size: 13.5px;
         color: var(--faint);
       }
@@ -699,35 +720,9 @@
     </style>
   </head>
   <body>
-    <header class="wrap">
-      <div class="masthead">
-        <a class="wordmark" href="/">
-          <span class="dot" aria-hidden="true"></span>
-          Actually Usable Calendar
-        </a>
-        <nav>
-          <a class="nav-hide" href="#why">Why</a>
-          <a class="nav-hide" href="#install">Install</a>
-          <a
-            href="https://github.com/Nils-dev-mertens/Betterfuckinguntis/issues"
-            target="_blank"
-            rel="noopener"
-            >Issues</a
-          >
-          <a
-            href="https://github.com/Nils-dev-mertens/Betterfuckinguntis"
-            target="_blank"
-            rel="noopener"
-            >Source</a
-          >
-        </nav>
-      </div>
-    </header>
-
     <main class="wrap">
-      <section class="hero" style="border-top: 0">
+      <section class="hero" style="border-top: 0; padding-top: clamp(48px, 8vw, 88px)">
         <div class="hero-copy">
-          <p class="eyebrow">Open source · Android &amp; web</p>
           <h1 class="hero-title">Your WebUntis timetable, in a week grid you can actually read.</h1>
           <p class="hero-sub">
             Syncs from your school once, then keeps working without a connection. No account,
@@ -867,7 +862,7 @@
           <div class="stat">
             <dt>Downloads</dt>
             <dd id="stat-downloads">—</dd>
-            <div class="stat-sub" id="stat-downloads-sub">APK installs</div>
+            <div class="stat-sub" id="stat-downloads-sub">APK downloads</div>
           </div>
           <div class="stat">
             <dt>Latest version</dt>
@@ -892,13 +887,10 @@
             </div>
           </div>
         </dl>
-        <p class="status-note">
-          <span class="state unknown" id="stat-deploy"><span id="stat-deploy-text">Checking last deploy…</span></span>
-        </p>
       </section>
 
       <section class="features" id="why">
-        <h2>What it does that the WebUntis site doesn't.</h2>
+        <h2>Everything the WebUntis site isn't.</h2>
         <ul>
           <li>
             <span class="ico">
@@ -943,12 +935,12 @@
         <h2>On your phone in two minutes.</h2>
         <ol>
           <li class="step">
-            <em>Step 1</em>
+            <em>1</em>
             <b>Download the APK</b>
             <span>Open the file from your downloads or notification shade.</span>
           </li>
           <li class="step">
-            <em>Step 2</em>
+            <em>2</em>
             <b>Allow the install</b>
             <span>
               Android asks once for <i>install unknown apps</i> — allow it for
@@ -956,7 +948,7 @@
             </span>
           </li>
           <li class="step">
-            <em>Step 3</em>
+            <em>3</em>
             <b>Pick your class</b>
             <span>Your timetable loads, and future updates arrive inside the app.</span>
           </li>
@@ -969,10 +961,10 @@
       </section>
 
       <section class="cta">
-        <h2>Stop squinting at the WebUntis list.</h2>
+        <h2>The WebUntis UI is genuinely bad. This isn't.</h2>
         <p>
-          One APK, your whole timetable, readable at a glance. Installing over an old version
-          keeps all your data.
+          Same timetable, none of the fighting. One APK, readable at a glance — and installing over
+          an old version keeps all your data.
         </p>
         <div class="actions">
           <a
@@ -995,9 +987,25 @@
             <span class="js-download-label">Get the APK</span>
           </a>
           <a class="btn secondary" href="https://betteruntis-app.nilsmertens.dev">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
             Use it in the browser
           </a>
         </div>
+        <p class="fineprint">Free, no account, no tracking.</p>
       </section>
     </main>
 
@@ -1124,23 +1132,6 @@
           }
         }
 
-        function renderDeploy(run) {
-          var badge = $('stat-deploy');
-          if (!run) {
-            if (badge) badge.classList.add('unknown');
-            setText('stat-deploy-text', 'No recent deploy found');
-            return;
-          }
-          var ok = run.conclusion === 'success' && run.status === 'completed';
-          if (badge) badge.classList.toggle('unknown', !ok);
-          var when = relative(run.updated_at || run.created_at);
-          setText(
-            'stat-deploy-text',
-            (ok ? 'Site is up to date' : 'Last deploy: ' + (run.conclusion || run.status)) +
-              (when ? ' · ' + when : '')
-          );
-        }
-
         /* Cache: a repeat visit paints instantly and stays inside the
            unauthenticated rate limit. */
         function readCache() {
@@ -1166,7 +1157,6 @@
         if (cached) {
           if (cached.repo) renderRepo(cached.repo);
           if (cached.releases) renderReleases(cached.releases);
-          if (cached.deploy) renderDeploy(cached.deploy);
           return;
         }
 
@@ -1177,24 +1167,12 @@
           get('/releases?per_page=100').catch(function () {
             return null;
           }),
-          get('/actions/runs?per_page=20').catch(function () {
-            return null;
-          }),
         ]).then(function (results) {
           var repoData = results[0];
           var releases = results[1];
-          var runs = results[2];
-
-          // The Deploy workflow rebuilds the website; ignore every other run.
-          var deployRun =
-            runs &&
-            (runs.workflow_runs || []).filter(function (r) {
-              return r.name === 'Deploy';
-            })[0];
 
           if (repoData) renderRepo(repoData);
           if (releases) renderReleases(releases);
-          if (runs) renderDeploy(deployRun);
 
           if (!repoData && !releases) {
             // Nothing resolved: keep the static copy honest instead of
@@ -1203,12 +1181,9 @@
             setText('stat-version', '—');
             setText('stat-stars', '—');
             setText('stat-issues', '—');
-            var badge = $('stat-deploy');
-            if (badge) badge.classList.add('unknown');
-            setText('stat-deploy-text', 'GitHub status unavailable right now');
           }
 
-          writeCache({ repo: repoData, releases: releases, deploy: deployRun });
+          writeCache({ repo: repoData, releases: releases });
         });
       })();
     </script>

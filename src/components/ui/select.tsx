@@ -1,4 +1,5 @@
 import { Icon } from '@/components/ui/icon';
+import { BACKDROP_COLOR } from '@/components/ui/backdrop';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -80,7 +81,12 @@ function SelectContent({
     <SelectPrimitive.Portal hostName={portalHost}>
       <FullWindowOverlay>
         <SelectPrimitive.Overlay
-          style={Platform.select({ native: StyleSheet.absoluteFill })}
+          // The same scrim as the sheets — an overlay without one lets the
+          // page behind it show through at full brightness on web.
+          style={Platform.select({
+            native: [StyleSheet.absoluteFill, { backgroundColor: BACKDROP_COLOR }],
+            default: { backgroundColor: BACKDROP_COLOR },
+          })}
           asChild={Platform.OS !== 'web'}>
           <NativeOnlyAnimatedView
             className="z-50"

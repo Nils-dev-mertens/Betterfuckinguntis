@@ -133,6 +133,7 @@ export default function SettingsScreen() {
     isHidden,
     updateReminders,
     updateDisplay,
+    reminderError,
   } = useCalendar();
   const { themeId, accentId, setTheme, setAccent } = useTheme();
 
@@ -452,6 +453,11 @@ export default function SettingsScreen() {
               </View>
             ) : null}
           </Section>
+          {notificationsSupported() && reminderError ? (
+            <SectionCaption>
+              Reminders are on, but the system refused to schedule them — {reminderError}
+            </SectionCaption>
+          ) : null}
         </View>
 
         {/* Hidden classes */}

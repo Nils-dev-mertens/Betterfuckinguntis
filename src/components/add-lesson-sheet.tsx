@@ -17,7 +17,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Pressable,
 } from 'react-native';
@@ -34,6 +33,7 @@ import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
+import { Backdrop } from '@/components/ui/backdrop';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -259,11 +259,7 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1">
-        <Pressable
-          onPress={onClose}
-          accessibilityLabel="Close"
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.65)' }]}
-        />
+        <Backdrop onPress={onClose} />
         <View className="flex-1 justify-end" style={themeStyle}>
           <View className="rounded-t-2xl border-t border-border bg-card px-4 pb-6 pt-3">
             <View className="mb-3 flex-row items-center justify-between">

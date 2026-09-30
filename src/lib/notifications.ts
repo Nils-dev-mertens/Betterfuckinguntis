@@ -74,18 +74,37 @@ function toWeeklySlot(startMs: number): WeeklySlot {
   };
 }
 
+/** Result of a scheduling run: how many reminders landed, and why the rest didn't. */
+export interface ScheduleResult {
+  /** Reminders the OS actually accepted. */
+  scheduled: number;
+  /**
+   * Human readable failures. Reminder scheduling is best-effort — one bad
+   * trigger must not abort the rest — so errors are collected and surfaced in
+   * Settings instead of being swallowed.
+   */
+  errors: string[];
+}
+
+export const EMPTY_SCHEDULE_RESULT: ScheduleResult = { scheduled: 0, errors: [] };
+
 /**
  * Schedules weekly reminders for the upcoming lessons (deduplicated per
  * weekday/time), each firing `leadMinutes` before the lesson starts.
- * Returns the number of scheduled reminders.
+ * Never throws: failures come back in `errors` so the UI can report them.
  */
 export async function scheduleLessonReminders(
   lessons: Lesson[],
   leadMinutes: ReminderLead
-): Promise<number> {
-  if (!notificationsSupported()) return 0;
-  await ensureChannel();
-  await Notifications.cancelAllScheduledNotificationsAsync();
+): Promise<ScheduleResult> {
+  if (!notificationsSupported()) return EMPTY_SCHEDULE_RESULT;
+  const errors: string[] = [];
+  try {
+    await ensureChannel();
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (error) {
+    return { scheduled: 0, errors: [describeError(error, 'Preparing the reminder channel')] };
+  }
 
   // Deduplicate: a weekly slot only needs one calendar trigger, even if ten
   // lessons share the same weekday+time across synced classes. The trigger
@@ -127,16 +146,25 @@ export async function scheduleLessonReminders(
         },
       });
       count += 1;
-    } catch {
-      // Individual trigger failure shouldn't abort the rest.
+    } catch (error) {
+      // Individual trigger failure shouldn't abort the rest, but it must not
+      // be invisible either — collect it for the Settings row.
+      errors.push(describeError(error, `${subject} reminder`));
     }
   }
-  return count;
+  return { scheduled: count, errors };
 }
 
-export async function cancelAllReminders() {
+/** Throws on failure so callers can report instead of silently doing nothing. */
+export async function cancelAllReminders(): Promise<void> {
   if (!notificationsSupported()) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+function describeError(error: unknown, context: string): string {
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'unknown error';
+  return `${context}: ${message}`;
 }
 
 function keyOf(slot: WeeklySlot): string {

@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
-import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Platform, View } from 'react-native';
+import { Backdrop } from '@/components/ui/backdrop';
 import { useCalendar } from '@/context/calendar-context';
 import { lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
 import { lightSubjectColor, subjectColor } from '@/lib/colors';
@@ -80,11 +81,7 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
         className="flex-1 justify-end web:justify-center web:items-center"
         style={themeStyle}>
         {/** theme vars re-declared so the sheet follows the picked theme */}
-        <Pressable
-          className="absolute inset-0"
-          style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}
-          onPress={onClose}
-        />
+        <Backdrop onPress={onClose} />
         <Card
           className="w-full rounded-b-none rounded-t-2xl border-x-0 border-b-0 web:max-w-md web:rounded-2xl web:border"
           style={{ backgroundColor: 'hsl(var(--card))' }}>

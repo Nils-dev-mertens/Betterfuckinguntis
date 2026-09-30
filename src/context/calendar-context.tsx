@@ -39,6 +39,12 @@ interface CalendarContextValue {
   syncNow: () => Promise<boolean>;
   /** Updates local reminder settings and re-schedules notifications */
   updateReminders: (settings: Partial<AppData['reminders']>) => Promise<void>;
+  /**
+   * Why the last reminder scheduling run failed, or null when it succeeded.
+   * Scheduling runs in a background effect, so without this the only symptom
+   * of a broken reminder channel would be silence.
+   */
+  reminderError: string | null;
   updateDisplay: (settings: Partial<AppData['display']>) => Promise<void>;
   /** Marks the first-launch intro as seen (done or skipped) */
   markIntroSeen: () => Promise<void>;
@@ -59,6 +65,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,12 +330,28 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   // re-runs this — scheduling itself cancels the previous set first.
   useEffect(() => {
     if (!hydrated) return;
-    if (!data.reminders.enabled) {
-      void cancelAllReminders();
-      return;
-    }
-    const visible = lessons.filter((lesson) => !isHidden(lesson));
-    void scheduleLessonReminders(visible, data.reminders.leadMinutes);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (!data.reminders.enabled) {
+          await cancelAllReminders();
+          if (!cancelled) setReminderError(null);
+          return;
+        }
+        const visible = lessons.filter((lesson) => !isHidden(lesson));
+        const result = await scheduleLessonReminders(visible, data.reminders.leadMinutes);
+        if (!cancelled) setReminderError(result.errors[0] ?? null);
+      } catch (error) {
+        // cancelAllReminders throws on failure; report rather than vanish.
+        if (!cancelled) {
+          setReminderError(error instanceof Error ? error.message : 'Could not update reminders.');
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [hydrated, lessons, isHidden, data.reminders.enabled, data.reminders.leadMinutes]);
 
   const value = useMemo<CalendarContextValue>(
@@ -350,10 +373,11 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       syncNow,
       updateReminders,
       updateDisplay,
+      reminderError,
       markIntroSeen,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, markIntroSeen, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, reminderError, markIntroSeen, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

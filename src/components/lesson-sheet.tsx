@@ -3,7 +3,7 @@ import { Alert, Modal, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backdrop } from '@/components/ui/backdrop';
 import { useCalendar } from '@/context/calendar-context';
-import { lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
+import { SLOT_DAY_NAMES, lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
 import { lightSubjectColor, subjectColor } from '@/lib/colors';
 import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
@@ -112,7 +112,7 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
                 {format(lesson.end, 'HH:mm')}
               </Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                Slot: {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][lessonDayOfWeek(lesson)]}{' '}
+                Slot: {SLOT_DAY_NAMES[lessonDayOfWeek(lesson)]}{' '}
                 {hh}:{mm}
               </Text>
             </View>

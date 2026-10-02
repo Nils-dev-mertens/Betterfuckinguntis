@@ -45,7 +45,8 @@ export function matchesRule(lesson: Lesson, rule: HiddenRule): boolean {
   return true;
 }
 
-const SLOT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Indexed by `lessonDayOfWeek` (0 = Sunday, like Date.getDay). */
+export const SLOT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function ruleLabelForLesson(lesson: Lesson): string {
   const { start } = lessonMinutes(lesson);

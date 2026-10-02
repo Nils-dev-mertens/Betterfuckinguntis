@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
-import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, AppState, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Icon as ArrowLeft,
@@ -28,7 +28,7 @@ import { countHiddenForRule } from '@/lib/hidden';
 import { displayBaseUrl } from '@/lib/sync';
 import { downloadLessonsCsv } from '@/lib/csv';
 import { downloadLessonsIcs } from '@/lib/ics-export';
-import { checkForUpdate, updatesSupported } from '@/lib/updates';
+import { checkForUpdate, updatesSupported, type CheckPhase } from '@/lib/updates';
 import type { SyncConfig } from '@/lib/types';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ function Row({
   icon,
   title,
   subtitle,
+  subtitleError,
   danger,
   disabled,
   onPress,
@@ -63,6 +64,8 @@ function Row({
   icon?: string;
   title: string;
   subtitle?: string;
+  /** Show the subtitle in full and in red — status messages must not be cut off. */
+  subtitleError?: boolean;
   danger?: boolean;
   disabled?: boolean;
   onPress?: () => void;
@@ -83,7 +86,12 @@ function Row({
       <View className="flex-1">
         <Text className={cn('text-sm font-medium', danger && 'text-destructive')}>{title}</Text>
         {subtitle ? (
-          <Text className="mt-0.5 text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+          <Text
+            className={cn(
+              'mt-0.5 text-xs leading-4',
+              subtitleError ? 'text-destructive' : 'text-muted-foreground'
+            )}
+            numberOfLines={subtitleError ? undefined : 1}>
             {subtitle}
           </Text>
         ) : null}
@@ -113,8 +121,29 @@ function IconGlyph({ name, danger }: { name: string; danger?: boolean }) {
   );
 }
 
-function SectionCaption({ children }: { children: React.ReactNode }) {
-  return <Text className="mt-1.5 px-1 text-xs leading-4 text-muted-foreground">{children}</Text>;
+function SectionCaption({ children, error }: { children: React.ReactNode; error?: boolean }) {
+  return (
+    <Text
+      className={cn(
+        'mt-1.5 px-1 text-xs leading-4',
+        error ? 'text-destructive' : 'text-muted-foreground'
+      )}>
+      {children}
+    </Text>
+  );
+}
+
+const UPDATE_PHASE_LABEL: Record<CheckPhase, string> = {
+  checking: 'Checking for updates…',
+  downloading: 'Downloading update…',
+  reloading: 'Restarting with the new version…',
+};
+
+/** Jump to this app's page in system settings, where blocked notifications are re-allowed. */
+function openNotificationSettings() {
+  Linking.openSettings().catch(() => {
+    Alert.alert('Could not open settings', 'Open your system settings and allow notifications for this app.');
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -134,23 +163,55 @@ export default function SettingsScreen() {
     updateReminders,
     updateDisplay,
     reminderError,
+    remindersScheduled,
   } = useCalendar();
   const { themeId, accentId, setTheme, setAccent } = useTheme();
 
   const [reminderPermission, setReminderPermission] = React.useState<string | null>(null);
+  const [reminderActionError, setReminderActionError] = React.useState<string | null>(null);
   React.useEffect(() => {
-    if (notificationsSupported()) void getPermissionStatus().then(setReminderPermission);
+    if (!notificationsSupported()) return;
+    const refresh = () => {
+      getPermissionStatus()
+        .then(setReminderPermission)
+        .catch(() => setReminderPermission(null));
+    };
+    refresh();
+    // Coming back from system settings: pick up a permission the user just
+    // granted or revoked there, instead of showing a stale state.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => subscription.remove();
   }, []);
 
   const toggleReminders = React.useCallback(
     async (enabled: boolean) => {
-      if (enabled) {
-        const status = await requestPermission();
-        setReminderPermission(status);
-        // Don't flip the switch on if the OS refused.
-        if (status !== 'granted') return;
+      setReminderActionError(null);
+      try {
+        if (enabled) {
+          const status = await requestPermission();
+          setReminderPermission(status);
+          // Don't flip the switch on if the OS refused — but say why, and
+          // offer the way out: once denied, the OS won't prompt again.
+          if (status !== 'granted') {
+            Alert.alert(
+              'Notifications are blocked',
+              'Allow notifications for this app in your system settings to get lesson reminders.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open settings', onPress: openNotificationSettings },
+              ]
+            );
+            return;
+          }
+        }
+        await updateReminders({ enabled });
+      } catch (error) {
+        setReminderActionError(
+          error instanceof Error ? error.message : 'Could not change the reminder setting.'
+        );
       }
-      await updateReminders({ enabled });
     },
     [updateReminders]
   );
@@ -209,13 +270,24 @@ export default function SettingsScreen() {
 
   const [checkingUpdate, setCheckingUpdate] = React.useState(false);
   const [updateMessage, setUpdateMessage] = React.useState<string | null>(null);
+  const [updateFailed, setUpdateFailed] = React.useState(false);
 
   const runUpdateCheck = React.useCallback(async () => {
     setCheckingUpdate(true);
-    setUpdateMessage(null);
-    const result = await checkForUpdate();
-    setUpdateMessage(result.message);
-    setCheckingUpdate(false);
+    setUpdateFailed(false);
+    setUpdateMessage(UPDATE_PHASE_LABEL.checking);
+    try {
+      const result = await checkForUpdate((phase) => setUpdateMessage(UPDATE_PHASE_LABEL[phase]));
+      setUpdateMessage(result.message);
+      setUpdateFailed(result.failed);
+    } catch (error) {
+      setUpdateMessage(
+        `Update check failed: ${error instanceof Error ? error.message : 'unknown error'}`
+      );
+      setUpdateFailed(true);
+    } finally {
+      setCheckingUpdate(false);
+    }
   }, []);
 
   // Only clear the status bar on native; web gets no extra top gap.
@@ -453,10 +525,30 @@ export default function SettingsScreen() {
               </View>
             ) : null}
           </Section>
-          {notificationsSupported() && reminderError ? (
-            <SectionCaption>
-              Reminders are on, but the system refused to schedule them — {reminderError}
-            </SectionCaption>
+          {notificationsSupported() ? (
+            reminderActionError ? (
+              <SectionCaption error>{reminderActionError}</SectionCaption>
+            ) : data.reminders.enabled && reminderPermission === 'denied' ? (
+              <Pressable onPress={openNotificationSettings} accessibilityRole="link">
+                <SectionCaption error>
+                  Reminders are on, but notifications are blocked for this app. Tap to open
+                  system settings.
+                </SectionCaption>
+              </Pressable>
+            ) : data.reminders.enabled && reminderError ? (
+              <SectionCaption error>
+                Reminders are on, but the system refused to schedule them — {reminderError}
+              </SectionCaption>
+            ) : data.reminders.enabled && remindersScheduled === 0 ? (
+              <SectionCaption>
+                No lessons to remind you about yet — sync a class or add a lesson.
+              </SectionCaption>
+            ) : data.reminders.enabled && remindersScheduled !== null ? (
+              <SectionCaption>
+                {remindersScheduled} weekly reminder{remindersScheduled === 1 ? '' : 's'} scheduled,{' '}
+                {data.reminders.leadMinutes} min before each lesson.
+              </SectionCaption>
+            ) : null
           ) : null}
         </View>
 
@@ -497,7 +589,8 @@ export default function SettingsScreen() {
             <Row
               icon="refresh"
               title="Check for updates"
-              subtitle={updateMessage ?? undefined}
+              subtitle={updateMessage ?? `Current version ${Constants.expoConfig?.version ?? '?'}`}
+              subtitleError={updateFailed}
               disabled={checkingUpdate}
               onPress={() => void runUpdateCheck()}
               last

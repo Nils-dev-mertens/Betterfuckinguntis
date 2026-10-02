@@ -85,7 +85,13 @@ function SelectContent({
           // page behind it show through at full brightness on web.
           style={Platform.select({
             native: [StyleSheet.absoluteFill, { backgroundColor: BACKDROP_COLOR }],
-            default: { backgroundColor: BACKDROP_COLOR },
+            // On web the primitive renders the overlay as a bare sibling of the
+            // content with no size of its own, so it has to be pinned to the
+            // viewport explicitly or the scrim is invisible.
+            default: [
+              StyleSheet.absoluteFill,
+              { position: 'fixed' as 'absolute', zIndex: 49, backgroundColor: BACKDROP_COLOR },
+            ],
           })}
           asChild={Platform.OS !== 'web'}>
           <NativeOnlyAnimatedView

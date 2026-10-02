@@ -45,6 +45,8 @@ interface CalendarContextValue {
    * of a broken reminder channel would be silence.
    */
   reminderError: string | null;
+  /** How many weekly reminders the last successful run scheduled (null until it ran). */
+  remindersScheduled: number | null;
   updateDisplay: (settings: Partial<AppData['display']>) => Promise<void>;
   /** Marks the first-launch intro as seen (done or skipped) */
   markIntroSeen: () => Promise<void>;
@@ -66,6 +68,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [reminderError, setReminderError] = useState<string | null>(null);
+  const [remindersScheduled, setRemindersScheduled] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -335,15 +338,22 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       try {
         if (!data.reminders.enabled) {
           await cancelAllReminders();
-          if (!cancelled) setReminderError(null);
+          if (!cancelled) {
+            setReminderError(null);
+            setRemindersScheduled(null);
+          }
           return;
         }
         const visible = lessons.filter((lesson) => !isHidden(lesson));
         const result = await scheduleLessonReminders(visible, data.reminders.leadMinutes);
-        if (!cancelled) setReminderError(result.errors[0] ?? null);
+        if (!cancelled) {
+          setReminderError(result.errors[0] ?? null);
+          setRemindersScheduled(result.scheduled);
+        }
       } catch (error) {
         // cancelAllReminders throws on failure; report rather than vanish.
         if (!cancelled) {
+          setRemindersScheduled(null);
           setReminderError(error instanceof Error ? error.message : 'Could not update reminders.');
         }
       }
@@ -374,10 +384,11 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       updateReminders,
       updateDisplay,
       reminderError,
+      remindersScheduled,
       markIntroSeen,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, reminderError, markIntroSeen, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, reminderError, remindersScheduled, markIntroSeen, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

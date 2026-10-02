@@ -28,6 +28,7 @@ import {
   Icon as Repeat,
   Icon as X,
 } from '@/components/ui/icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendar } from '@/context/calendar-context';
 import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
@@ -201,6 +202,7 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
   // Modals render outside the themed root view, so the CSS variables must
   // be re-declared here for the picked theme/accent to apply inside.
   const { style: themeStyle } = useTheme();
+  const insets = useSafeAreaInsets();
   const today = startOfDay(new Date());
 
   const [subject, setSubject] = React.useState('');
@@ -255,13 +257,24 @@ export function AddLessonSheet({ isOpen, onClose, onAdd }: AddLessonSheetProps) 
       transparent
       animationType="fade"
       statusBarTranslucent={Platform.OS === 'android'}
+      // Edge-to-edge Android: without this the scrim stops above the
+      // navigation bar, leaving an undimmed strip at the bottom.
+      navigationBarTranslucent={Platform.OS === 'android'}
       onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1">
         <Backdrop onPress={onClose} />
-        <View className="flex-1 justify-end" style={themeStyle}>
-          <View className="rounded-t-2xl border-t border-border bg-card px-4 pb-6 pt-3">
+        {/* box-none: taps on the empty area above the sheet must reach the
+            Backdrop underneath (a sibling, so touches don't bubble to it). */}
+        <View
+          pointerEvents="box-none"
+          className="flex-1 justify-end web:items-center web:justify-center"
+          style={themeStyle}>
+          <View className="max-h-full w-full rounded-t-2xl border-t border-border bg-card px-4 pb-6 pt-3 web:max-w-md web:rounded-2xl web:border"
+            // The modal draws behind the Android navigation bar; keep the
+            // Add button clear of it.
+            style={{ paddingBottom: 24 + insets.bottom }}>
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-lg font-bold">Add lesson</Text>
               <Pressable

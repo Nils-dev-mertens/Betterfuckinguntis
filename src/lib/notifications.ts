@@ -100,6 +100,15 @@ export async function scheduleLessonReminders(
   if (!notificationsSupported()) return EMPTY_SCHEDULE_RESULT;
   const errors: string[] = [];
   try {
+    // Permission can be revoked in system settings at any time. The OS still
+    // accepts schedules then, but nothing ever shows — so say it outright.
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== Notifications.PermissionStatus.GRANTED) {
+      return {
+        scheduled: 0,
+        errors: ['Notifications are blocked for this app. Allow them in system settings.'],
+      };
+    }
     await ensureChannel();
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (error) {

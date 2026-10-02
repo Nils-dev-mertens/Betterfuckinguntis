@@ -1,8 +1,9 @@
 import { format } from 'date-fns';
 import { Alert, Modal, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backdrop } from '@/components/ui/backdrop';
 import { useCalendar } from '@/context/calendar-context';
-import { lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
+import { SLOT_DAY_NAMES, lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
 import { lightSubjectColor, subjectColor } from '@/lib/colors';
 import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
@@ -20,12 +21,14 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
   const { isHidden, hideLesson, unhideRule, removeLesson, removeLessonOccurrence } = useCalendar();
   // Modals render outside the themed root view, so the CSS variables must
   // be re-declared here for the picked theme/accent to apply inside.
-  const { style: themeStyle } = useTheme();
+  const { style: themeStyle, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
+  // All hooks run above this line: an early return before a hook changes the
+  // hook count between renders, which React rejects.
   if (!lesson) return null;
   const hidden = isHidden(lesson);
   const rule = ruleFromLesson(lesson);
-  const { isDark } = useTheme();
   const color = isDark
     ? subjectColor(lesson.subject, lesson.color)
     : lightSubjectColor(lesson.subject, lesson.color);
@@ -76,6 +79,9 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
       transparent
       animationType="fade"
       statusBarTranslucent={Platform.OS === 'android'}
+      // Edge-to-edge Android: without this the scrim stops above the
+      // navigation bar, leaving an undimmed strip at the bottom.
+      navigationBarTranslucent={Platform.OS === 'android'}
       onRequestClose={onClose}>
       <View
         className="flex-1 justify-end web:justify-center web:items-center"
@@ -87,7 +93,10 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
           // `hsl(var(--card))` would bypass NativeWind, which is what
           // resolves the CSS variable on native — React Native's colour
           // parser cannot read `var()`, so the sheet rendered transparent.
-          className="w-full rounded-b-none rounded-t-2xl border-x-0 border-b-0 web:max-w-md web:rounded-2xl web:border">
+          className="w-full rounded-b-none rounded-t-2xl border-x-0 border-b-0 web:max-w-md web:rounded-2xl web:border"
+          // The modal draws behind the Android navigation bar; keep the
+          // buttons clear of it.
+          style={{ paddingBottom: insets.bottom }}>
           <CardHeader>
             <View className="flex-row items-center gap-2">
               <View className="h-6 w-2 rounded-full" style={{ backgroundColor: color.accent }} />
@@ -103,7 +112,7 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
                 {format(lesson.end, 'HH:mm')}
               </Text>
               <Text className="mt-1 text-sm text-muted-foreground">
-                Slot: {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][lessonDayOfWeek(lesson)]}{' '}
+                Slot: {SLOT_DAY_NAMES[lessonDayOfWeek(lesson)]}{' '}
                 {hh}:{mm}
               </Text>
             </View>

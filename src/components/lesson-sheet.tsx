@@ -1,9 +1,10 @@
 import { format } from 'date-fns';
-import { Alert, Modal, Platform, View } from 'react-native';
+import * as React from 'react';
+import { Alert, Modal, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backdrop } from '@/components/ui/backdrop';
 import { useCalendar } from '@/context/calendar-context';
-import { SLOT_DAY_NAMES, lessonDayOfWeek, lessonMinutes, ruleFromLesson } from '@/lib/hidden';
+import { SLOT_DAY_NAMES, lessonDayOfWeek, lessonMinutes, ruleScopeText } from '@/lib/hidden';
 import { lightSubjectColor, subjectColor } from '@/lib/colors';
 import { useTheme } from '@/context/theme-context';
 import type { Lesson } from '@/lib/types';
@@ -18,17 +19,32 @@ interface LessonSheetProps {
 }
 
 export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
-  const { isHidden, hideLesson, unhideRule, removeLesson, removeLessonOccurrence } = useCalendar();
+  const {
+    isHidden,
+    hiddenRuleFor,
+    hideLesson,
+    hideLessonForWeeks,
+    unhideRule,
+    removeLesson,
+    removeLessonOccurrence,
+  } = useCalendar();
   // Modals render outside the themed root view, so the CSS variables must
   // be re-declared here for the picked theme/accent to apply inside.
   const { style: themeStyle, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  /** How many weekly occurrences a scoped hide covers; 1 = this week only. */
+  const [hideWeeks, setHideWeeks] = React.useState(1);
+  // Opening another lesson starts from "this week only" again.
+  React.useEffect(() => setHideWeeks(1), [lesson?.uid]);
 
   // All hooks run above this line: an early return before a hook changes the
   // hook count between renders, which React rejects.
   if (!lesson) return null;
   const hidden = isHidden(lesson);
-  const rule = ruleFromLesson(lesson);
+  // The rule that actually hides it — unhiding it must not depend on a rule
+  // rebuilt from this lesson, which can carry other teachers/time data.
+  const hiddenRule = hiddenRuleFor(lesson);
+  const scopedHide = (hiddenRule?.dates?.length ?? 0) > 0;
   const color = isDark
     ? subjectColor(lesson.subject, lesson.color)
     : lightSubjectColor(lesson.subject, lesson.color);
@@ -163,25 +179,56 @@ export function LessonSheet({ lesson, onClose }: LessonSheetProps) {
                   </Button>
                 )}
               </>
-            ) : hidden ? (
+            ) : hidden && hiddenRule ? (
               <View className="gap-2">
                 <Text className="text-center text-sm font-semibold text-primary">
-                  This class (every week) is hidden.
+                  {scopedHide
+                    ? `Hidden for ${ruleScopeText(hiddenRule)}.`
+                    : 'This class (every week) is hidden.'}
                 </Text>
-                <Button variant="outline" size="sm" onPress={() => unhideRule(rule.id)}>
-                  <Text>Show again in all weeks</Text>
+                <Button variant="outline" size="sm" onPress={() => void unhideRule(hiddenRule.id)}>
+                  <Text>{scopedHide ? 'Show again' : 'Show again in all weeks'}</Text>
                 </Button>
               </View>
             ) : (
-              <Button variant="destructive" size="sm" onPress={() => hideLesson(lesson)}>
-                <Text>Hide this class in all weeks</Text>
-              </Button>
+              <View className="gap-2">
+                <Button variant="destructive" size="sm" onPress={() => void hideLesson(lesson)}>
+                  <Text>Hide every week</Text>
+                </Button>
+                {/* Scope picker: limit the hide to the next few weeks of the slot */}
+                <View className="flex-row items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
+                  <Text className="text-xs font-medium text-muted-foreground">Hide for</Text>
+                  <View className="flex-row items-center gap-2">
+                    <Pressable
+                      onPress={() => setHideWeeks((current) => Math.max(1, current - 1))}
+                      accessibilityLabel="Fewer weeks"
+                      className="h-7 w-7 items-center justify-center rounded-md bg-secondary active:bg-accent">
+                      <Text className="text-base font-bold text-secondary-foreground">−</Text>
+                    </Pressable>
+                    <Text className="w-16 text-center text-sm font-semibold tabular-nums">
+                      {hideWeeks} {hideWeeks === 1 ? 'week' : 'weeks'}
+                    </Text>
+                    <Pressable
+                      onPress={() => setHideWeeks((current) => Math.min(12, current + 1))}
+                      accessibilityLabel="More weeks"
+                      className="h-7 w-7 items-center justify-center rounded-md bg-secondary active:bg-accent">
+                      <Text className="text-base font-bold text-secondary-foreground">+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => void hideLessonForWeeks(lesson, hideWeeks)}>
+                  <Text>{hideWeeks === 1 ? 'Hide for 1 week' : `Hide for ${hideWeeks} weeks`}</Text>
+                </Button>
+              </View>
             )}
             {!isManual ? (
               <Text className="text-center text-xs text-muted-foreground">
                 {hidden
-                  ? 'This hides the matching recurring slot only in this calendar. It will stay hidden for future weeks.'
-                  : 'Hides every matching recurring weekly slot — now and in future weeks. Manage from Settings.'}
+                  ? 'Hiding applies to this weekly slot. Everything hidden is listed in Settings.'
+                  : '“Hide every week” hides the slot in all weeks; the counter hides only the next few. Manage from Settings.'}
               </Text>
             ) : null}
           </CardContent>

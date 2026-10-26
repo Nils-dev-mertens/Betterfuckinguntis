@@ -47,7 +47,10 @@ export interface Lesson {
   repeatUntil?: string;
 }
 
-/** A rule that hides one recurring weekly class slot, now and in future weeks. */
+/**
+ * A rule that hides one recurring weekly class slot. By default all weeks are
+ * hidden; when `dates` is set only those dates are.
+ */
 export interface HiddenRule {
   id: string;
   /** Human readable label shown in settings */
@@ -61,6 +64,11 @@ export interface HiddenRule {
   /** Duration in minutes of the source lesson */
   durationMinutes: number;
   teachers: string[];
+  /**
+   * ISO dates (`YYYY-MM-DD`) this rule hides, when only the next few weekly
+   * occurrences were hidden. Absent = every week of the slot.
+   */
+  dates?: string[];
   createdAt: number;
 }
 
@@ -97,6 +105,12 @@ export interface DisplaySettings {
   defaultView: ViewMode;
   /** Whether Saturday and Sunday are shown */
   showWeekend: boolean;
+  /**
+   * Which default-view generation this device has seen. Bumped when the app's
+   * standard view changes, so the switch is applied exactly once and a user's
+   * own later choice is never overwritten.
+   */
+  viewDefaultVersion: number;
 }
 
 export interface AppData {

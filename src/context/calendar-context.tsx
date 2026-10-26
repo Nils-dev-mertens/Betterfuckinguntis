@@ -1,11 +1,15 @@
 import * as React from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { clearAppData, EMPTY_DATA, loadAppData, saveAppData } from '@/lib/storage';
 import { fetchLessons } from '@/lib/sync';
 import { cancelAllReminders, scheduleLessonReminders } from '@/lib/notifications';
-import { matchesRule, ruleFromLesson } from '@/lib/hidden';
+import { matchesRule, ruleFromLesson, weekDatesFrom } from '@/lib/hidden';
 import type { AppData, ClassTimetable, HiddenRule, Lesson, SyncConfig } from '@/lib/types';
-import { v4 as uuidv4 } from 'uuid';
+// `uuid` comes from expo-modules-core, which delegates to the platform: the
+// native UUID generator on Android/iOS and Web Crypto in the browser. The
+// `uuid` npm package instead reads the global `crypto` directly, which Hermes
+// does not define — so creating a manual lesson threw there and never saved.
+import { uuid } from 'expo-modules-core';
 import { format } from 'date-fns';
 
 interface SyncOutcome {
@@ -23,7 +27,12 @@ interface CalendarContextValue {
   syncError: string | null;
   isHidden: (lesson: Lesson) => boolean;
   hiddenRules: HiddenRule[];
+  /** The rule that hides this lesson right now, or null when it's visible */
+  hiddenRuleFor: (lesson: Lesson) => HiddenRule | null;
+  /** Hides a lesson's weekly slot in every week */
   hideLesson: (lesson: Lesson) => Promise<void>;
+  /** Hides a lesson's weekly slot for its next `weeks` occurrences only */
+  hideLessonForWeeks: (lesson: Lesson, weeks: number) => Promise<void>;
   unhideRule: (ruleId: string) => Promise<void>;
   /** Adds a class (or replaces it if already watched) and syncs its timetable */
   addClass: (config: SyncConfig) => Promise<SyncOutcome>;
@@ -99,17 +108,32 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     [data.hidden]
   );
 
-  const hideLesson = useCallback(
-    async (lesson: Lesson) => {
-      const rule = ruleFromLesson(lesson);
-      const exists = data.hidden.some((existing) => existing.id === rule.id);
-      if (exists) return;
+  const hiddenRuleFor = useCallback(
+    (lesson: Lesson) => data.hidden.find((rule) => matchesRule(lesson, rule)) ?? null,
+    [data.hidden]
+  );
+
+  /** Adds a hidden rule unless the very same scope is already hidden. */
+  const addHiddenRule = useCallback(
+    async (rule: HiddenRule) => {
+      if (data.hidden.some((existing) => existing.id === rule.id)) return;
       await persist({
         ...data,
         hidden: [...data.hidden, rule],
       });
     },
     [data, persist]
+  );
+
+  const hideLesson = useCallback(
+    (lesson: Lesson) => addHiddenRule(ruleFromLesson(lesson)),
+    [addHiddenRule]
+  );
+
+  const hideLessonForWeeks = useCallback(
+    (lesson: Lesson, weeks: number) =>
+      addHiddenRule(ruleFromLesson(lesson, weekDatesFrom(lesson, weeks))),
+    [addHiddenRule]
   );
 
   const unhideRule = useCallback(
@@ -128,9 +152,16 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       setSyncing(true);
       setSyncError(null);
       try {
-        // Subject names hidden by a rule are excluded at fetch time, the same
-        // way the reference server's `&filter=` parameter works.
-        const hiddenSubjects = [...new Set(data.hidden.map((rule) => rule.subject))];
+        // Subject names hidden in every week are excluded at fetch time, the
+        // same way the reference server's `&filter=` parameter works. Only
+        // unscoped rules may do this: a rule limited to a few weeks must not
+        // drop the subject from the fetch, or the weeks after it — the whole
+        // year — would never be stored and could not come back.
+        const hiddenSubjects = [
+          ...new Set(
+            data.hidden.filter((rule) => (rule.dates?.length ?? 0) === 0).map((rule) => rule.subject)
+          ),
+        ];
         const results = await Promise.all(
           targets.map((target) =>
             fetchLessons(
@@ -184,6 +215,19 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     return outcome.ok;
   }, [data.timetables, syncClasses]);
 
+  /**
+   * Sync once per app start, so the calendar is current without anyone
+   * tapping "Sync now". Runs after hydration and only when a class is
+   * watched; the ref stops a finished sync from firing again when the stored
+   * timetables change or the screen remounts.
+   */
+  const startupSynced = useRef(false);
+  useEffect(() => {
+    if (!hydrated || startupSynced.current || data.timetables.length === 0) return;
+    startupSynced.current = true;
+    void syncNow();
+  }, [hydrated, data.timetables.length, syncNow]);
+
   const resetAll = useCallback(async () => {
     await clearAppData();
     setData(EMPTY_DATA);
@@ -218,7 +262,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     async (lesson: Omit<Lesson, 'uid' | 'manual'>) => {
       const manualLesson: Lesson = {
         ...lesson,
-        uid: `manual-${uuidv4()}`,
+        uid: `manual-${uuid.v4()}`,
         manual: true,
       };
       await persist((current) => ({
@@ -373,7 +417,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       syncError,
       isHidden,
       hiddenRules: data.hidden,
+      hiddenRuleFor,
       hideLesson,
+      hideLessonForWeeks,
       unhideRule,
       addClass,
       removeClass,
@@ -388,7 +434,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       markIntroSeen,
       resetAll,
     }),
-    [hydrated, data, lessons, syncing, syncError, isHidden, hideLesson, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, reminderError, remindersScheduled, markIntroSeen, resetAll]
+    [hydrated, data, lessons, syncing, syncError, isHidden, hiddenRuleFor, hideLesson, hideLessonForWeeks, unhideRule, addClass, removeClass, addLesson, removeLesson, removeLessonOccurrence, syncNow, updateReminders, updateDisplay, reminderError, remindersScheduled, markIntroSeen, resetAll]
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

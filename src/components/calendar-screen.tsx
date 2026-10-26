@@ -382,7 +382,7 @@ export function CalendarScreen() {
         <View className="absolute bottom-3 right-3 flex-row items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg shadow-black/40">
           <EyeOff size={12} color="hsl(var(--muted-foreground))" as="eye-off" />
           <Text className="text-[11px] text-muted-foreground">
-            {hiddenRules.length} class{hiddenRules.length === 1 ? '' : 'es'} hidden
+            {hiddenRules.length} hidden
           </Text>
         </View>
       )}

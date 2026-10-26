@@ -24,7 +24,7 @@ import {
 } from '@/lib/notifications';
 import { ACCENTS, THEMES } from '@/lib/themes';
 import { cn } from '@/lib/utils';
-import { countHiddenForRule } from '@/lib/hidden';
+import { countHiddenForRule, ruleScopeText } from '@/lib/hidden';
 import { displayBaseUrl } from '@/lib/sync';
 import { downloadLessonsCsv } from '@/lib/csv';
 import { downloadLessonsIcs } from '@/lib/ics-export';
@@ -558,7 +558,7 @@ export default function SettingsScreen() {
             <Row
               icon="eye-off"
               title="Nothing hidden"
-              subtitle="Open a lesson on the calendar and choose “Hide this class”"
+              subtitle="Open a lesson on the calendar and choose how long to hide it"
               last
             />
           ) : (
@@ -569,7 +569,7 @@ export default function SettingsScreen() {
                 title={rule.label}
                 subtitle={`${countHiddenForRule(rule, lessons)} lesson${
                   countHiddenForRule(rule, lessons) === 1 ? '' : 's'
-                } across weeks`}
+                } · hidden ${ruleScopeText(rule)}`}
                 right={
                   <Switch
                     checked

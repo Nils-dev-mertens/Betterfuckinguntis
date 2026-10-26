@@ -12,13 +12,20 @@ const LEGACY_KEY = 'auch:app:v1';
 const LEGACY_PROVIDER_URL = 'ap.webuntis.viovyx.com';
 const API_ROOT = '/WebUntis/api/rest/view/v1';
 
+/**
+ * Generation of the default calendar view. Bump when the app's standard view
+ * changes; devices below the current one are moved onto it exactly once (see
+ * `migrateViewDefault`).
+ */
+const VIEW_DEFAULT_VERSION = 1;
+
 export const EMPTY_DATA: AppData = {
   timetables: [],
   manualLessons: [],
   hidden: [],
   lastSyncedAt: null,
   reminders: { enabled: false, leadMinutes: 10 },
-  display: { defaultView: '5d', showWeekend: true },
+  display: { defaultView: 'grid', showWeekend: true, viewDefaultVersion: VIEW_DEFAULT_VERSION },
   introSeen: false,
 };
 
@@ -31,6 +38,24 @@ function normalizeDisplay(value: unknown): DisplaySettings {
       ? (display.defaultView as ViewMode)
       : EMPTY_DATA.display.defaultView,
     showWeekend: display.showWeekend !== false,
+    viewDefaultVersion:
+      typeof display.viewDefaultVersion === 'number' ? display.viewDefaultVersion : 0,
+  };
+}
+
+/**
+ * Moves a device onto the app's standard view, once. Installations that never
+ * changed the old 5-day default follow it; anyone who picked another view keeps
+ * it, and the stored version marks the migration as done so choosing 5 days
+ * afterwards isn't undone on the next launch.
+ */
+function migrateViewDefault(display: DisplaySettings): DisplaySettings {
+  if (display.viewDefaultVersion >= VIEW_DEFAULT_VERSION) return display;
+  return {
+    ...display,
+    defaultView:
+      display.defaultView === '5d' ? EMPTY_DATA.display.defaultView : display.defaultView,
+    viewDefaultVersion: VIEW_DEFAULT_VERSION,
   };
 }
 
@@ -86,7 +111,7 @@ export async function loadAppData(): Promise<AppData> {
           enabled: reminders.enabled === true,
           leadMinutes: reminders.leadMinutes === 5 || reminders.leadMinutes === 15 ? reminders.leadMinutes : 10,
         },
-        display: normalizeDisplay(parsed.display),
+        display: migrateViewDefault(normalizeDisplay(parsed.display)),
         // Users who installed before the intro existed never see it.
         introSeen: parsed.introSeen === true || timetables.length > 0,
       };
